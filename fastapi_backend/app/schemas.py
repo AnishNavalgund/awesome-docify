@@ -1,34 +1,34 @@
-import uuid
-
-from fastapi_users import schemas
 from pydantic import BaseModel
-from uuid import UUID
+from datetime import datetime
+from typing import Optional
 
 
-class UserRead(schemas.BaseUser[uuid.UUID]):
+class ExampleBase(BaseModel):
+    """Base schema for Example"""
+
+    title: str
+    description: Optional[str] = None
+
+
+class ExampleCreate(ExampleBase):
+    """Schema for creating an Example"""
+
     pass
 
 
-class UserCreate(schemas.BaseUserCreate):
-    pass
+class ExampleUpdate(BaseModel):
+    """Schema for updating an Example"""
+
+    title: Optional[str] = None
+    description: Optional[str] = None
 
 
-class UserUpdate(schemas.BaseUserUpdate):
-    pass
+class Example(ExampleBase):
+    """Schema for Example response"""
 
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
-class ItemBase(BaseModel):
-    name: str
-    description: str | None = None
-    quantity: int | None = None
-
-
-class ItemCreate(ItemBase):
-    pass
-
-
-class ItemRead(ItemBase):
-    id: UUID
-    user_id: UUID
-
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True

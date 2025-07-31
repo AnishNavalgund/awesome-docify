@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OUTPUT_FILE = os.getenv("OPENAPI_OUTPUT_FILE")
+OUTPUT_FILE = os.getenv("OPENAPI_OUTPUT_FILE", "openapi.json")
 
 
 def generate_openapi_schema(output_file):
@@ -30,11 +30,18 @@ def remove_operation_id_tag(schema):
     """
     for path_data in schema["paths"].values():
         for operation in path_data.values():
-            tag = operation["tags"][0]
+            # Skip if operation doesn't have tags or operationId
+            if "tags" not in operation or "operationId" not in operation:
+                continue
+
+            tag = operation["tags"][0] if operation["tags"] else "default"
             operation_id = operation["operationId"]
             to_remove = f"{tag}-"
-            new_operation_id = operation_id[len(to_remove) :]
-            operation["operationId"] = new_operation_id
+
+            # Only remove prefix if it exists
+            if operation_id.startswith(to_remove):
+                new_operation_id = operation_id[len(to_remove) :]
+                operation["operationId"] = new_operation_id
     return schema
 
 
