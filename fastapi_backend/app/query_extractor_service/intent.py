@@ -3,6 +3,8 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from app.schemas import Intent
 from app.config import settings
+from app.utils import logger_info
+
 
 # Initialize LLM
 llm = ChatOpenAI(
@@ -31,6 +33,7 @@ async def extract_intent(user_query: str) -> Intent:
 
     try:
         response = await llm.ainvoke(formatted_prompt)
+        logger_info.info(f"LLM Call successful")
         return parser.parse(response.content)
     except Exception as e:
         # Check if it's an API key error

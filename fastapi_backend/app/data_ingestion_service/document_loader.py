@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from app.utils import logger_info, logger_error
 
 # LangChain imports
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -36,7 +37,7 @@ class DocumentLoader:
         docs_path = Path(docs_dir)
         
         if not docs_path.exists():
-            print(f"Error: Directory {docs_dir} does not exist")
+            logger_error.error(f"Error: Directory {docs_dir} does not exist")
             return documents
         
         # Get all JSON files
@@ -54,7 +55,7 @@ class DocumentLoader:
                     doc['metadata']['document_id'] = f"{json_file.stem}_{int(json_file.stat().st_mtime)}"
                     documents.append(doc)
             except Exception as e:
-                print(f"Error loading {json_file}: {e}")
+                logger_error.error(f"Error loading {json_file}: {e}")
         
         return documents
     
@@ -91,14 +92,14 @@ class DocumentLoader:
         documents = await self.load_json_documents(docs_dir)
         
         if not documents:
-            print("No JSON documents found to ingest")
+            logger_error.error("No JSON documents found to ingest")
             return
         
-        print(f"Loaded {len(documents)} JSON documents")
+        logger_info.info(f"Loaded {len(documents)} JSON documents")
         
         # Chunk documents using LangChain
         chunked_docs = await self.chunk_documents(documents, chunk_size)
-        print(f"Created {len(chunked_docs)} chunks using LangChain text splitter")
+        logger_info.info(f"Created {len(chunked_docs)} chunks using LangChain text splitter")
         
         try:
             # Create collection
@@ -109,12 +110,12 @@ class DocumentLoader:
             
             # Get collection info
             info = await vector_store.get_collection_info()
-            print(f"Collection info: {info}")
+            #print(f"Collection info: {info}")
             
-            print("JSON document ingestion completed successfully with LangChain!")
+            logger_info.info("JSON document ingestion completed successfully with LangChain!")
             
         except Exception as e:
-            print(f"Error during ingestion: {e}")
+            logger_error.error(f"Error during ingestion: {e}")
             raise
 
 # Global instance

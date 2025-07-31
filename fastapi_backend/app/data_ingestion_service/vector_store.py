@@ -17,6 +17,8 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Qdrant
 from langchain.schema import Document
 
+from app.utils import logger_info, logger_error
+
 from ..config import settings
 
 class VectorStore:
@@ -59,12 +61,12 @@ class VectorStore:
                         distance=Distance.COSINE
                     )
                 )
-                print(f"Created collection: {self.collection_name}")
+                # print(f"Created collection: {self.collection_name}")
             else:
-                print(f"Collection {self.collection_name} already exists")
+                logger_info.info(f"Collection already exists")
                 
         except Exception as e:
-            print(f"Error creating collection: {e}")
+            logger_error.error(f"Error creating collection: {e}")
             raise
     
     async def add_documents(self, documents: List[Dict[str, Any]]):
@@ -124,7 +126,7 @@ class VectorStore:
             # Build search parameters
             search_kwargs = {"k": limit}
             
-            # Add filters if provided
+            # Add filters
             if filters:
                 search_kwargs["filter"] = self._build_langchain_filter(filters)
             
@@ -173,22 +175,22 @@ class VectorStore:
         try:
             collection_info = self.client.get_collection(self.collection_name)
             
-            print(f">>>> Collection info object: {collection_info}")
-            print(f">>>> Collection info type: {type(collection_info)}")
-            print(f">>>> Collection info dir: {dir(collection_info)}")
+            # print(f">>>> Collection info object: {collection_info}")
+            # print(f">>>> Collection info type: {type(collection_info)}")
+            # print(f">>>> Collection info dir: {dir(collection_info)}")
             
 
             name = getattr(collection_info, 'name', None)
             if name is None:
                 name = getattr(collection_info, 'collection_name', self.collection_name)
             
-            vectors_count = getattr(collection_info, 'vectors_count', None)
-            if vectors_count is None:
-                vectors_count = getattr(collection_info, 'count', 0)
-            
+            # In Qdrant, points_count is the main count attribute
             points_count = getattr(collection_info, 'points_count', None)
             if points_count is None:
                 points_count = getattr(collection_info, 'count', 0)
+            
+            # vectors_count should be the same as points_count in Qdrant
+            vectors_count = points_count
             
             status = getattr(collection_info, 'status', 'unknown')
             
@@ -199,7 +201,7 @@ class VectorStore:
                 "status": status
             }
         except Exception as e:
-            print(f"Error getting collection info: {e}")
+            logger_error.error(f"Error getting collection info: {e}")
             # Return a default structure if there's an error
             return {
                 "name": self.collection_name,
@@ -208,12 +210,13 @@ class VectorStore:
                 "status": "unknown"
             }
     
-    async def delete_documents(self, document_ids: List[str]):
-        """Delete documents by document_id"""
+    # For future use
+    async def delete_documents(self, document_name: str):
+        """Delete documents by document name"""
         try:
             # Build filter for document_ids
             filter_condition = Filter(
-                must=[FieldCondition(key="document_id", match=MatchValue(any=document_ids))]
+                must=[FieldCondition(key="document_id", match=MatchValue(any=document_name))]
             )
             
             # Delete points matching the filter
@@ -222,10 +225,10 @@ class VectorStore:
                 points_selector=filter_condition
             )
             
-            print(f"Deleted documents with IDs: {document_ids}")
+            logger_info.info(f"Deleted documents with name: {document_name}")
             
         except Exception as e:
-            print(f"Error deleting documents: {e}")
+            logger_error.error(f"Error deleting documents: {e}")
             raise
 
 # Global instance
