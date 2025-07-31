@@ -7,6 +7,9 @@ from typing import Optional, List
 from pathlib import Path
 from datetime import datetime
 
+from app.query_extractor_service.intent import extract_intent
+from openai import OpenAI
+
 from .utils import simple_generate_unique_route_id
 from app.config import settings
 from app.database import create_db_and_tables
@@ -51,10 +54,16 @@ async def query_docs(request: QueryRequest):
     """
     Accept user query and return AI-generated diff suggestion
     """
-    # TODO: implement RAG pipeline and model call
+    # Step 1: Extract intent from natural language query
+    intent = await extract_intent(request.query)
+    print("Intent extracted:", intent.model_dump())
+
+    # TODO: Pass intent into your RAG pipeline and generate actual diff
+
+    # Temporary placeholder response
     return QueryResponse(
-        suggested_diff="Replace `add()` with `add2()`",
-        confidence=0.87,
+        suggested_diff=f"Action: {intent.action}, Target: {intent.target}",
+        confidence=0.85,
         fallback_used=False
     )
 
@@ -98,18 +107,38 @@ async def startup_event():
     await create_db_and_tables()
     
     try:
+        # Test OpenAI API key first
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        # Simple test call
+        client.models.list()
+        print("OpenAI API key is valid")
+        
         await vector_store.create_collection()
         print("Vector database collection initialized")
         
-        docs_dir = "../local-shared-data/docs"
-        docs_path = Path(docs_dir)
+        # Check if vector store is empty
+        collection_info = await vector_store.get_collection_info()
+        points_count = collection_info.get("points_count", 0)
+        print(f"Current collection info: {collection_info}")
         
-        if docs_path.exists():
-            print(f"Loading documents from {docs_dir}...")
-            await document_loader.ingest_documents(docs_dir)
-            print("Document ingestion completed at startup")
+        if points_count == 0:
+            # Only ingest if vector store is empty
+            docs_dir = "../local-shared-data/docs"
+            docs_path = Path(docs_dir)
+            
+            if docs_path.exists():
+                print(f"Vector store is empty. Loading documents from {docs_dir}...")
+                await document_loader.ingest_documents(docs_dir)
+                print("Document ingestion completed at startup")
+                
+                # Check collection info again after ingestion
+                updated_collection_info = await vector_store.get_collection_info()
+                print(f"Updated collection info after ingestion: {updated_collection_info}")
+            else:
+                print(f"Document directory {docs_dir} not found, skipping ingestion")
         else:
-            print(f"Document directory {docs_dir} not found, skipping ingestion")
+            print(f"Vector store already contains {points_count} documents. Skipping ingestion.")
             
     except Exception as e:
         print(f"Warning: Could not initialize vector database or load documents: {e}")
+        print("Application will start without document ingestion. Please check your OpenAI API key and try again.")

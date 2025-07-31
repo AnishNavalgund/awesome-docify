@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 
 # ---------- API MODELS ----------
 
@@ -35,3 +35,13 @@ class CollectionInfo(BaseModel):
     vectors_count: int
     points_count: int
     status: str
+
+# ---------- Service MODELS ----------
+
+class Intent(BaseModel):
+    action: Literal["add", "remove", "modify"]
+    target: str = Field(..., description="The function/class/section to act on")
+    file: Optional[str] = Field(None, description="Optional file name (e.g. 'vector_store.py')")
+    object_type: Optional[Literal["function", "class", "section", "line"]] = Field(
+        None, description="Type of element to act on"
+    )

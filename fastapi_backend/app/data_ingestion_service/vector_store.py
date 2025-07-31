@@ -154,8 +154,6 @@ class VectorStore:
     
     def _build_langchain_filter(self, filters: Dict) -> Dict:
         """Build LangChain filter from dictionary"""
-        # LangChain uses a different filter format than Qdrant
-        # For now, return empty dict - can be enhanced later
         return {}
     
     def _build_filter(self, filters: Dict) -> Filter:
@@ -173,12 +171,32 @@ class VectorStore:
     async def get_collection_info(self) -> Dict[str, Any]:
         """Get information about the collection"""
         try:
-            collection_info = await self.client.get_collection(self.collection_name)
+            collection_info = self.client.get_collection(self.collection_name)
+            
+            print(f">>>> Collection info object: {collection_info}")
+            print(f">>>> Collection info type: {type(collection_info)}")
+            print(f">>>> Collection info dir: {dir(collection_info)}")
+            
+
+            name = getattr(collection_info, 'name', None)
+            if name is None:
+                name = getattr(collection_info, 'collection_name', self.collection_name)
+            
+            vectors_count = getattr(collection_info, 'vectors_count', None)
+            if vectors_count is None:
+                vectors_count = getattr(collection_info, 'count', 0)
+            
+            points_count = getattr(collection_info, 'points_count', None)
+            if points_count is None:
+                points_count = getattr(collection_info, 'count', 0)
+            
+            status = getattr(collection_info, 'status', 'unknown')
+            
             return {
-                "name": collection_info.name,
-                "vectors_count": collection_info.vectors_count,
-                "points_count": collection_info.points_count,
-                "status": collection_info.status
+                "name": name,
+                "vectors_count": vectors_count,
+                "points_count": points_count,
+                "status": status
             }
         except Exception as e:
             print(f"Error getting collection info: {e}")
