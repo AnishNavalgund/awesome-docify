@@ -16,7 +16,6 @@ from qdrant_client.http import models
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Qdrant
 from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from ..config import settings
 
@@ -174,7 +173,7 @@ class VectorStore:
     async def get_collection_info(self) -> Dict[str, Any]:
         """Get information about the collection"""
         try:
-            collection_info = self.client.get_collection(self.collection_name)
+            collection_info = await self.client.get_collection(self.collection_name)
             return {
                 "name": collection_info.name,
                 "vectors_count": collection_info.vectors_count,

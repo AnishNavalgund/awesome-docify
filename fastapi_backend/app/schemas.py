@@ -2,33 +2,36 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+# ---------- API MODELS ----------
 
-class ExampleBase(BaseModel):
-    """Base schema for Example"""
+class QueryRequest(BaseModel):
+    query: str
+    target_file: Optional[str] = None
 
-    title: str
-    description: Optional[str] = None
+class QueryResponse(BaseModel):
+    suggested_diff: str
+    confidence: float
+    fallback_used: bool
 
+class SaveChangeRequest(BaseModel):
+    original_code: str
+    updated_code: str
+    diff: str
+    approved_by: str
+    timestamp: datetime
 
-class ExampleCreate(ExampleBase):
-    """Schema for creating an Example"""
+class SaveChangeResponse(BaseModel):
+    status: str
 
-    pass
+class IngestRequest(BaseModel):
+    docs_dir: str
 
+class IngestResponse(BaseModel):
+    ingested_files: int
+    status: str
 
-class ExampleUpdate(BaseModel):
-    """Schema for updating an Example"""
-
-    title: Optional[str] = None
-    description: Optional[str] = None
-
-
-class Example(ExampleBase):
-    """Schema for Example response"""
-
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+class CollectionInfo(BaseModel):
+    name: str
+    vectors_count: int
+    points_count: int
+    status: str
