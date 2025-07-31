@@ -68,6 +68,18 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+# Postgres and Qdrant DB volumes
+local-shared-data/postgres/
+local-shared-data/qdrant/
+
+# input json files
+local-shared-data/docs/
+
+# metadata clutter
+local-shared-data/**/.DS_Store
+local-shared-data/**/__pycache__/
+
+
 # Sphinx documentation
 docs/_build/
 
