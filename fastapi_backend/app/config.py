@@ -1,16 +1,24 @@
 from typing import Set
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # OpenAPI docs
+    # Database settings
+    DATABASE_URL: Optional[str] = None
+    
+    # OpenAI settings
+    OPENAI_API_KEY: str
+    
+    # Qdrant settings
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+    QDRANT_COLLECTION_NAME: str = "openai_docs"
+    
+    # API settings
     OPENAPI_URL: str = "/openapi.json"
-
-
-    DATABASE_URL: str | None = None
-    TEST_DATABASE_URL: str | None = None
-
+    
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
 

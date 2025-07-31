@@ -80,6 +80,9 @@ docker compose up -d
 ```bash
 # Start backend
 cd fastapi_backend
+# Start qdrant database
+docker compose up qdrant -d
+# Start backend
 uv run uvicorn app.main:app --reload
 
 # Start frontend (in another terminal)
@@ -95,6 +98,7 @@ docker compose up db -d
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs  
 - **Postgres Database**: http://localhost:5432
+- **Qdrant Database**: http://localhost:6333
 
 ## Project Structure
 

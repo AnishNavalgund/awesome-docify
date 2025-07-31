@@ -13,6 +13,13 @@ dependencies = [
     "asyncpg>=0.29.0,<1.0.0",
     "psycopg2-binary>=2.9.0,<3.0.0",
     "watchdog>=5.0.0,<6.0.0",
+    "openai>=1.98.0",
+    "qdrant-client>=1.15.0",
+    "tqdm>=4.67.1",
+    "python-dotenv>=1.0.1",
+    "langchain>=0.2.0",
+    "langchain-openai>=0.1.0",
+    "langchain-community>=0.2.0",
 ]
 
 [dependency-groups]
