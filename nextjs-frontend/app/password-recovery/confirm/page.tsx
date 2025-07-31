@@ -1,9 +1,5 @@
-"use client";
-
-import { useActionState } from "react";
-import { notFound, useSearchParams } from "next/navigation";
-import { passwordResetConfirm } from "@/components/actions/password-reset-action";
-import { SubmitButton } from "@/components/ui/submitButton";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -11,66 +7,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Suspense } from "react";
-import { FieldError, FormError } from "@/components/ui/FormError";
 
-function ResetPasswordForm() {
-  const [state, dispatch] = useActionState(passwordResetConfirm, undefined);
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
-
-  if (!token) {
-    notFound();
-  }
-
+export default function PasswordRecoveryConfirmPage() {
   return (
-    <form action={dispatch}>
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Reset your Password</CardTitle>
-          <CardDescription>
-            Enter the new password and confirm it.
+    <div className="flex h-screen w-full items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+      <Card className="w-full max-w-sm rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-semibold text-gray-800 dark:text-white">
+            Reset Password
+          </CardTitle>
+          <CardDescription className="text-sm text-gray-600 dark:text-gray-400">
+            This is a placeholder for your password reset confirmation.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required />
+        <CardContent className="grid gap-6 p-6">
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+            Implement your password reset confirmation functionality here.
           </div>
-          <FieldError state={state} field="password" />
-          <div className="grid gap-2">
-            <Label htmlFor="passwordConfirm">Password Confirm</Label>
-            <Input
-              id="passwordConfirm"
-              name="passwordConfirm"
-              type="password"
-              required
-            />
-          </div>
-          <FieldError state={state} field="passwordConfirm" />
-          <input
-            type="hidden"
-            id="resetToken"
-            name="resetToken"
-            value={token}
-            readOnly
-          />
-          <SubmitButton text={"Send"} />
-          <FormError state={state} />
+          <Link href="/">
+            <Button className="w-full">Back to Home</Button>
+          </Link>
         </CardContent>
       </Card>
-    </form>
-  );
-}
-
-export default function Page() {
-  return (
-    <div className="flex h-screen w-full items-center justify-center px-4">
-      <Suspense fallback={<div>Loading reset form...</div>}>
-        <ResetPasswordForm />
-      </Suspense>
     </div>
   );
 }

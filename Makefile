@@ -30,6 +30,12 @@ start-frontend: ## Start the frontend server with pnpm and hot reload
 test-frontend: ## Run frontend tests using npm
 	cd $(FRONTEND_DIR) && pnpm run test
 
+# Local application commands
+.PHONY: start-local-application
+
+start-local-application: ## Start frontend and backend concurrently
+	(cd $(FRONTEND_DIR) && pnpm dev) & \
+	(cd $(BACKEND_DIR) && ./start.sh)
 
 # Docker commands
 .PHONY: docker-backend-shell docker-frontend-shell docker-build docker-build-backend \

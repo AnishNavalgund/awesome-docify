@@ -1,70 +1,142 @@
-## Next.js FastAPI Template
+# Awesome Docify
 
-<a href="https://www.vintasoftware.com/blog/next-js-fastapi-template"><img src="images/banner.png" alt="Next.js FastAPI Template" width="auto"></a>
-<p align="center">
-    <em>Next.js FastAPI Template: Python + Modern TypeScript stack with Zod validation.</em>
-</p>
-<p align="center">
-<a href="https://github.com/vintasoftware/nextjs-fastapi-template/actions/workflows/ci.yml" target="_blank">
-    <img src="https://github.com/vintasoftware/nextjs-fastapi-template/actions/workflows/ci.yml/badge.svg" alt="CI">
-</a>
-<a href="https://coveralls.io/github/vintasoftware/nextjs-fastapi-template" target="_blank">
-    <img src="https://coveralls.io/repos/github/vintasoftware/nextjs-fastapi-template/badge.svg" alt="Coverage">
-</a>
-</p>
+Your AI assistant for painless documentation updates.
 
----
+## Tech Stack
 
-**Documentation**: <a href="https://vintasoftware.github.io/nextjs-fastapi-template/" target="_blank">https://vintasoftware.github.io/nextjs-fastapi-template/</a>
+- [**Next.js 15**](https://nextjs.org/) - React framework with App Router
+- [**FastAPI**](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [**TypeScript**](https://www.typescriptlang.org/) - Type-safe development
+- [**Tailwind CSS**](https://tailwindcss.com/) - Utility-first CSS framework
+- [**shadcn/ui**](https://ui.shadcn.com/) - Beautiful React components
+- [**Docker**](https://www.docker.com/) - Containerized development environment
+- [**CI/CD**](https://github.com/features/actions) - GitHub Actions workflows for testing
 
-**Source Code**: <a href="https://github.com/vintasoftware/nextjs-fastapi-template/" target="_blank">https://github.com/vintasoftware/nextjs-fastapi-template/</a>
+## Prerequisites
 
----
+Before getting started, ensure you have the following tools installed:
 
-The Next.js FastAPI Template provides a solid foundation for scalable, high-performance web applications, following clean architecture and best practices. It simplifies development by integrating FastAPI, Pydantic, and Next.js with TypeScript and Zod, ensuring end-to-end type safety and schema validation between frontend and backend.
+- **UV** - Fast Python package manager
+- **PNPM** - Fast Next.js & React package manager  
+- **Pre-commit** - Git hooks for code quality
+- **Make** - Build automation tool
+- **Docker** - Containerization platform
+- **Docker Compose** - Multi-container orchestration
 
-The FastAPI backend supports fully asynchronous operations, optimizing database queries, API routes, and test execution for better performance. Deployment is seamless, with both backend and frontend fully deployable to Vercel, enabling quick product releases with minimal configuration.
+**For detailed installation instructions, see [docs/prerequisites.md](docs/prerequisites.md)**
 
-### Key features
-✔ End-to-end type safety – Automatically generated typed clients from the OpenAPI schema ensure seamless API contracts between frontend and backend.
+### Quick Verification
 
-✔ Hot-reload updates – The client updates automatically when backend routes change, keeping FastAPI and Next.js in sync.
+Run this command to verify all prerequisites are installed:
 
-✔ Versatile foundation – Designed for MVPs and production-ready applications, with a pre-configured authentication system and API layer.
+```bash
+echo "UV: $(uv --version)" && echo "PNPM: $(pnpm --version)" && echo "Make: $(make --version)" && echo "Docker: $(docker --version)" && echo "Docker Compose: $(docker compose version)" && echo "Pre-commit: $(pre-commit --version)"
+```
 
-✔ Quick deployment – Deploys a full-stack application—including authentication flow and a dashboard—on Vercel in just a few steps.
+## Getting Started
 
-✔ Production-ready authentication – Includes a pre-configured authentication system and dashboard interface, allowing you to immediately start development with user management features.
+### 1. Clone the repository
+```bash
+git clone https://github.com/AnishNavalgund/awesome-docify.git
+cd awesome-docify
+```
 
-## Technology stack
-This template features a carefully selected set of technologies to ensure efficiency, scalability, and ease of use:
+### 2. Install dependencies
 
-- Zod + TypeScript – Type safety and schema validation across the stack.
-- fastapi-users – Complete authentication system with:
-    - Secure password hashing
-    - JWT authentication
-- Email-based password recovery
-- shadcn/ui – Prebuilt React components with Tailwind CSS.
-- OpenAPI-fetch – Fully typed client generation from the OpenAPI schema.
-- UV – Simplified dependency management and packaging.
-- Docker Compose – Consistent environments for development and production.
-- Pre-commit hooks – Automated code linting, formatting, and validation before commits.
-- Vercel Deployment – Serverless backend and scalable frontend, deployable with minimal configuration.
+```bash
+# Install all dependencies (backend + frontend)
+make install
 
-This is a partial list of the technologies included in the template. For a complete overview, visit our [Technology selection](https://vintasoftware.github.io/nextjs-fastapi-template/technology-selection/) page.
+# Or install manually:
+# Backend dependencies
+cd fastapi_backend
+uv sync
 
-## Get Started
+# Frontend dependencies  
+cd ../nextjs-frontend
+pnpm install
+```
 
-To use this template, visit our [Get Started](https://vintasoftware.github.io/nextjs-fastapi-template/get-started/) and follow the steps.
+### 3. Pre-commit Setup
 
-## Using the template? Let's talk!
+```bash
+# Install pre-commit
+pip install pre-commit
 
-We’re always curious to see how the community builds on top of it and where it’s being used. To collaborate:
+# Install the git hooks
+pre-commit install
 
-- Join the conversation on [GitHub Discussions](https://github.com/vintasoftware/nextjs-fastapi-template/discussions)
-- Report bugs or suggest improvements via [issues](https://github.com/vintasoftware/nextjs-fastapi-template/issues)
-- Check the [Contributing](https://vintasoftware.github.io/nextjs-fastapi-template/contributing/) guide to get involved
+# Run against all files (optional)
+pre-commit run --all-files
+```
 
-This project is maintained by [Vinta Software](https://www.vinta.com.br/) and is actively used in production systems we build for clients. Talk to our expert consultants — get a free technical review: contact@vinta.com.br.
+### 4. Start the application
+**Option A: Using Docker**
+```bash
+docker compose up -d
+```
 
-*Disclaimer: This project is not affiliated with Vercel.*
+**Option B: Local Development**
+```bash
+# Start backend
+cd fastapi_backend
+uv run uvicorn app.main:app --reload
+
+# Start frontend (in another terminal)
+cd nextjs-frontend
+pnpm dev
+
+# Postgres Database
+docker compose up db -d
+```
+
+### 4. Access the application
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs  
+- **Postgres Database**: http://localhost:5432
+
+## Project Structure
+
+```
+awesome-docify/
+├── fastapi_backend/          # FastAPI backend
+│   ├── app/                 # Application code
+│   ├── tests/               # Backend tests
+│   └── pyproject.toml       # Python dependencies
+├── nextjs-frontend/         # Next.js frontend
+│   ├── app/                 # App Router pages
+│   ├── components/          # React components
+│   └── package.json         # Node.js dependencies
+├── docs/                    # Documentation
+├── docker-compose.yml       # Docker services
+└── Makefile                 # Build automation
+```
+
+## Available Commands
+
+### Make Commands (Local Development/Deployment)
+- `make install` - Install all dependencies
+- `make start-local-application` - Start local application
+- `make build-frontend` - Build frontend for production
+- `make lint-frontend` - Run ESLint
+- `make test-frontend` - Run frontend tests
+- `make start-frontend` - Start frontend
+- `make test-backend` - Run backend tests
+- `make coverage-backend` - Run backend tests with coverage
+- `make start-backend` - Start backend
+- `make migrate` - Run database migrations
+- `make reset-db` - Reset database
+
+### Docker Commands
+- `docker compose up -d` - Start all services
+- `docker compose down` - Stop all services
+- `docker compose logs -f` - View logs
+- `docker compose up backend -d` - Start backend only
+- `docker compose up frontend -d` - Start frontend only
+- `docker compose up db -d` - Start database only
+
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE.txt).
