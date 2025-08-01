@@ -8,9 +8,10 @@ from app.schemas import (
     IngestRequest,
     IngestResponse,
     CollectionInfo,
+    DocumentUpdate,
 )
-from app.query_extractor_service.intent import extract_intent
-from app.ai_engine_service import run_query_pipeline
+from app.ai_engine_service.intent import extract_intent
+from app.ai_engine_service import orchestrator
 from app.data_ingestion_service import vector_store, document_loader
 from app.utils import logger_info, logger_error
 
@@ -20,24 +21,28 @@ router = APIRouter(prefix="/api/v1", tags=["Docify"])
 @router.post("/query", response_model=QueryResponse)
 async def query_docs(request: QueryRequest):
     """
-    Accept user query and return AI-generated diff suggestion
+    Accept user query and return which documents need to be updated
     """
-    intent = await extract_intent(request.query)
-    logger_info.info(f">>>> Intent extracted: {intent.model_dump()}")
-
     try:
-        rag_result = await run_query_pipeline(intent, original_query=request.query)
-        return QueryResponse(**rag_result)
+        # Pass the query directly to the vanilla RAG pipeline
+        result = await orchestrator(request.query)
+        return QueryResponse(**result)
     except Exception as e:
-        logger_error.error(f"RAG pipeline error: {e}")
+        logger_error.error(f"RAG orchestrator error: {e}")
+        # Create fallback response
+        fallback_docs = [
+            DocumentUpdate(
+                file="unknown_document.json",
+                action="modify",
+                reason=f"Error occurred while analyzing query: {request.query}",
+                section=None
+            )
+        ]
         return QueryResponse(
-            suggested_diff=(
-                f"Action: {intent.action}, Target: {intent.target} "
-                "(Fallback: RAG pipeline unavailable)"
-            ),
-            confidence=0.0,
-            fallback_used=True,
-            score_breakdown=None
+            query=request.query,
+            analysis=f"Error occurred while analyzing query: {request.query}",
+            documents_to_update=fallback_docs,
+            total_documents=1
         )
 
 

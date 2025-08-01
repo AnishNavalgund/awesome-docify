@@ -1,90 +1,173 @@
-from app.schemas import Intent
+from app.schemas import Intent, DocumentUpdate
 from app.data_ingestion_service import vector_store
+from app.ai_engine_service.intent import extract_intent, IntentHandlerFactory
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
 from app.config import settings
-from .confidence_scorer import ConfidenceScorer
 from app.utils import logger_info
-# Initialize confidence scorer
-confidence_scorer = ConfidenceScorer(confidence_threshold=0.6)
+import warnings
+from typing import List, Dict, Any
+import re
 
-async def run_query_pipeline(intent: Intent, original_query: str = "") -> dict:
+warnings.filterwarnings("ignore")
+
+class DocuRAG:
     """
-    Run the RAG pipeline to generate AI diff suggestions based on user intent.
+    Awesome Docuemnt RAG
     """
-    try:
-        logger_info.info(f">>>>>>> Running RAG pipeline")
-        # Retrieve relevant chunks from Qdrant
-        search_results = await vector_store.search(query=intent.target, limit=5)
+    
+    def __init__(self, 
+                 llm_model: ChatOpenAI = None,
+                 top_k_docs: int = 50):  # Increased to get more results
         
-        # Build context string
-        context_parts = []
-        for result in search_results:
-            content = result.get("content", "")
-            title = result.get("title", "")
-            url = result.get("url", "")
-            context_entry = f"Title: {title}\nURL: {url}\nContent: {content}\n"
-            context_parts.append(context_entry)
-        
-        context = "\n---\n".join(context_parts)
-        
-        # Generate response with LLM
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an AI assistant that generates code/documentation updates based on user intent."),
-            ("human", """
-            Intent: {intent}
-
-            Relevant Context from Documentation: {context}
-
-            Based on the user's intent and the relevant documentation context above, please provide a specific suggestion for what changes should be made. 
-
-            Your response should be:
-            1. Clear and actionable
-            2. Specific enough to implement
-            3. Based on the provided context
-            4. Include code examples if relevant
-
-            Please provide your suggestion:
-            """)
-        ])
-
-        llm = ChatOpenAI(
+        self.llm_model = llm_model or ChatOpenAI(
             model="gpt-4o-mini",
             temperature=0.3,
             openai_api_key=settings.OPENAI_API_KEY
         )
+        self.top_k_docs = top_k_docs
         
-        formatted_prompt = prompt.format_messages(
-            intent=intent.model_dump(),
-            context=context
-        )
+    async def search_documents(self, keyword: str) -> List[Dict[str, Any]]:
+        """
+        Search for documents containing the exact keyword.
+        """
+        try:
+            print(f"Searching for exact keyword: {keyword}")
+            # Get more results initially to filter
+            results = await vector_store.search(query=keyword, limit=100)
+            print(f"Found {len(results)} initial results")
+            
+            # Filter to only include documents that actually contain the keyword
+            exact_matches = []
+            for doc in results:
+                content = doc.get("content", "").lower()
+                if keyword.lower() in content:
+                    exact_matches.append(doc)
+            
+            print(f"Found {len(exact_matches)} documents with exact keyword match")
+            return exact_matches
+            
+        except Exception as e:
+            print(f"Search error: {e}")
+            return []
+    
+    def filter_chunks(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter chunks - remove those with less than 100 characters.
+        """
+        filtered_docs = []
+        for doc in documents:
+            content = doc.get("content", "")
+            if len(content.strip()) >= 100:
+                filtered_docs.append(doc)
         
-        response = await llm.ainvoke(formatted_prompt)
+        print(f"Filtered from {len(documents)} to {len(filtered_docs)} chunks")
+        return filtered_docs
+    
+    def extract_content_with_context(self, documents: List[Dict[str, Any]], keyword: str) -> List[Dict[str, Any]]:
+        """
+        Extract content with context around the keyword for each document.
+        """
+        content_extracts = []
         
-        # Score the suggestion
-        confidence, score_breakdown = await confidence_scorer.score_suggestion(
-            suggestion=response.content,
-            search_results=search_results,
-            intent=intent,
-            query=original_query or intent.target
-        )
+        for doc in documents:
+            content = doc.get("content", "")
+            doc_id = doc.get("document_id", "")
+            title = doc.get("title", "")
+            
+            # Find the keyword in the content
+            keyword_lower = keyword.lower()
+            content_lower = content.lower()
+            
+            if keyword_lower in content_lower:
+                # Find the position of the keyword
+                start_pos = content_lower.find(keyword_lower)
+                
+                # Extract context around the keyword 
+                context_start = max(0, start_pos - 500)
+                context_end = min(len(content), start_pos + len(keyword) + 500)
+                
+                # Extract the context
+                context = content[context_start:context_end]
+                
+                # Find the actual keyword in the original case
+                keyword_pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+                match = keyword_pattern.search(context)
+                
+                if match:
+                    # Get the actual keyword with original case
+                    actual_keyword = context[match.start():match.end()]
+                    
+                    content_extracts.append({
+                        "document_id": doc_id,
+                        "title": title,
+                        "content": context,
+                        "keyword": actual_keyword,
+                        "keyword_position": match.start(),
+                        "full_content": content,
+                        "url": doc.get("url", ""),
+                        "source_url": doc.get("source_url", "")
+                    })
         
-        # Check if we should use fallback
-        if confidence_scorer.should_use_fallback(confidence):
-            fallback_response = confidence_scorer.get_fallback_response(intent, original_query or intent.target)
+        return content_extracts
+    
+    async def task_runner(self, query: str) -> dict:
+
+        try:
+            print(f"=== TASK ENTRY POINT ===")
+            print(f"Query: {query}")
+            
+            #  Extract keyword using Query Extractor Service
+            print("Step 1: Extracting keyword...")
+            intent = await extract_intent(query)
+            print(f">>>> Intent: {intent}")
+            keyword = intent.target
+            print(f"Extracted keyword: {keyword}")
+            
+            # Search documents
+            print("Step 2: Searching documents...")
+            documents = await self.search_documents(keyword)
+            
+            # Filter chunks
+            print("Step 3: Filtering chunks...")
+            filtered_docs = self.filter_chunks(documents)
+            
+            # Extract content with context
+            print("Step 4: Extracting content with context...")
+            content_extracts = self.extract_content_with_context(filtered_docs, keyword)
+            
+            # Process intent using appropriate handler
+            print("Step 5: Processing intent with handler...")
+            handler = IntentHandlerFactory.create_handler(intent, self.llm_model)
+            documents_to_update = await handler.process_intent(intent, query, content_extracts)
+            
+            print(f"Generated {len(documents_to_update)} document updates with content")
+            
             return {
-                "suggested_diff": fallback_response,
-                "confidence": confidence,
-                "fallback_used": True,
-                "score_breakdown": score_breakdown
+                "query": query,
+                "keyword": keyword,
+                "analysis": f"Found {len(documents_to_update)} documents containing the keyword '{keyword}'. Generated suggested changes for {intent.action} operation.",
+                "documents_to_update": documents_to_update,
+                "total_documents": len(documents_to_update)
             }
-        
-        return {
-            "suggested_diff": response.content,
-            "confidence": confidence,
-            "fallback_used": False,
-            "score_breakdown": score_breakdown
-        }
-        
-    except Exception as e:
-        raise ValueError(f"Failed to run RAG pipeline: {e}")
+            
+        except Exception as e:
+            print(f"Pipeline error: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return {
+                "query": query,
+                "keyword": "unknown",
+                "analysis": f"Error occurred while processing query: {str(e)}",
+                "documents_to_update": [],
+                "total_documents": 0
+            }
+
+# Global instance
+task = DocuRAG()
+
+async def orchestrator(query: str) -> dict:
+    """
+    Main entry point
+    """
+    print(f"Query: {query}")
+    return await task.task_runner(query)

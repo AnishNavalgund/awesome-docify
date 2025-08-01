@@ -7,11 +7,23 @@ from typing import Optional, Literal, List, Dict, Any
 class QueryRequest(BaseModel):
     query: str = Field(..., description="Natural language query from user")
 
+class DocumentUpdate(BaseModel):
+    """Represents a document that needs to be updated"""
+    file: str = Field(..., description="Document file name")
+    action: Literal["add", "remove", "modify"] = Field(..., description="Type of action needed")
+    reason: str = Field(..., description="Why this document needs to be updated")
+    section: Optional[str] = Field(None, description="Specific section that needs changes")
+    original_content: Optional[str] = Field(None, description="Original content from the document")
+    new_content: Optional[str] = Field(None, description="Suggested new content")
+    confidence: Optional[float] = Field(None, description="Confidence score for the suggested change")
+    line_numbers: Optional[List[int]] = Field(None, description="Line numbers where changes should be made")
+
 class QueryResponse(BaseModel):
-    suggested_diff: str = Field(..., description="AI-generated diff suggestion")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score between 0 and 1")
-    fallback_used: bool = Field(..., description="Whether fallback response was used")
-    score_breakdown: Optional[Dict[str, float]] = Field(None, description="Detailed confidence score breakdown")
+    """Simple response showing which documents need updates"""
+    query: str = Field(..., description="Original user query")
+    analysis: str = Field(..., description="What the AI found and analyzed")
+    documents_to_update: List[DocumentUpdate] = Field(..., description="List of documents that need changes")
+    total_documents: int = Field(..., description="Total number of documents that need updates")
 
 class SaveChangeRequest(BaseModel):
     original_code: str = Field(..., description="Original code to be modified")
@@ -54,4 +66,10 @@ class Intent(BaseModel):
     object_type: Optional[Literal["function", "class", "section", "line"]] = Field(
         None, description="Type of element to act on"
     )
+
+
+class ContentChange(BaseModel):
+    """Structured output for content changes"""
+    original_content: str = Field(description="The original content as is")
+    new_content: str = Field(description="The new content with changes")
 
