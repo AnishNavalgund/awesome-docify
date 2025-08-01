@@ -3,49 +3,36 @@ Prompts for the Document Update RAG Pipeline
 """
 from langchain.prompts import ChatPromptTemplate
 
-# System Prompt
-SYSTEM_PROMPT = """
-You are an expert in documentation review and update.
-
-Your task is to:
-1. Determine whether the provided documentation content should be modified, removed, or left unchanged based on a user's update request.
-2. Suggest precise and relevant edits (if any).
-
-Only propose updates that are directly related to the user's request.
-
-Return your output as a JSON object containing:
-- "analysis": A short explanation of what needs to change (if anything).
-- "documents_to_update": A list detailing the documents that need changes, with fields:
-  - "file name"
-  - "action" (modified / removed / unchanged / new)
-  - "section" (if identifiable)
-"""
-
-
-
 # Intent Extraction Prompt
 INTENT_EXTRACTION_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", "Extract a structured developer intent from the query below."),
+    ("system", "Analyze the user's query and extract the intent: ADD/DELETE/MODIFY and target."),
     ("human", "{query}\n\n{format_instructions}")
 ])
 
-# Content Change Generation Prompt Template
-CONTENT_CHANGE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
-    ("human", """Based on the user query: "{query}"
+# Unified Content Change Generation Prompt Template
+UNIFIED_CONTENT_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", """You are a precise and reliable documentation editor assistant. Based on the user's intent and the given content, perform one of the following operations:
 
-The user wants to change the keyword "{keyword}" in the following content:
+1. **ADD** – Insert the provided information at the most contextually appropriate location within the content. 
+2. **DELETE** – Remove any references to the target keyword and related lines or sections.
+3. **MODIFY** – Revise or update the relevant part of the content based on the query.
+
+For ADD operations: If the target doesn't exist, add it in an appropriate section. Create new sections if needed.
+- Do not hallucinate or invent content beyond what the query and keyword imply.
+- Only suggest changes that improve the documentation based on the user's request.
+- Preserve formatting and indentation wherever possible.
+
+Return your result strictly in JSON format with the following fields:
+- `"original_content"`: The unchanged content segment.
+- `"new_content"`: The updated version of the content after the operation."""),
+
+    ("human", """User Query: "{query}"
+Target Keyword: "{keyword}"
+Documentation Content:
 
 {content}
 
-Please provide:
-1. The original content (as is)
-2. The suggested new content with the appropriate changes
-
-Format your response as JSON:
-{{
-    "original_content": "the original content",
-    "new_content": "the new content with changes"
-}}""")
+Now return only the JSON output as described above.""")
 ])
+
 

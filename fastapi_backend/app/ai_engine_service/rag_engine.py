@@ -20,31 +20,57 @@ class DocuRAG:
                  top_k_docs: int = 50):  # Increased to get more results
         
         self.llm_model = llm_model or ChatOpenAI(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             temperature=0.3,
             openai_api_key=settings.OPENAI_API_KEY
         )
         self.top_k_docs = top_k_docs
         
-    async def search_documents(self, keyword: str) -> List[Dict[str, Any]]:
+    async def search_documents(self, keyword: str, intent_action: str = None) -> List[Dict[str, Any]]:
         """
-        Search for documents containing the exact keyword.
+        Search for documents containing the exact keyword or related content for additions.
         """
         try:
-            print(f"Searching for exact keyword: {keyword}")
-            # Get more results initially to filter
-            results = await vector_store.search(query=keyword, limit=100)
+            print(f"Searching for keyword: {keyword} with action: {intent_action}")
+            
+            # Optimize initial search limit based on operation type
+            initial_limit = 50 if intent_action == "add" else 30
+            results = await vector_store.search(query=keyword, limit=initial_limit)
             print(f"Found {len(results)} initial results")
             
-            # Filter to only include documents that actually contain the keyword
-            exact_matches = []
+            # Filter to include documents that contain the keyword or related terms
+            keyword_matches = []
+            keyword_lower = keyword.lower()
+            keyword_words = keyword_lower.split()
+            
             for doc in results:
                 content = doc.get("content", "").lower()
-                if keyword.lower() in content:
-                    exact_matches.append(doc)
+                
+                # Check for exact keyword match
+                if keyword_lower in content:
+                    keyword_matches.append(doc)
+                # Check for partial matches (at least 2 words from the keyword)
+                elif len(keyword_words) > 1:
+                    word_matches = sum(1 for word in keyword_words if word in content)
+                    if word_matches >= min(2, len(keyword_words)):
+                        keyword_matches.append(doc)
+                # For single word keywords, check for partial matches
+                elif len(keyword_words) == 1 and len(keyword_lower) > 3:
+                    # Check if the word appears as part of other words
+                    if any(keyword_lower in word for word in content.split()):
+                        keyword_matches.append(doc)
             
-            print(f"Found {len(exact_matches)} documents with exact keyword match")
-            return exact_matches
+            print(f"Found {len(keyword_matches)} documents with keyword match")
+            
+            # For addition operations, if no matches found, get some general content
+            if intent_action == "add" and len(keyword_matches) == 0:
+                print("No matches found for addition, getting general content...")
+                # Get some general documentation content for the LLM to work with
+                general_results = await vector_store.search(query="documentation", limit=3)
+                keyword_matches = general_results
+                print(f"Found {len(keyword_matches)} general documents for addition")
+            
+            return keyword_matches
             
         except Exception as e:
             print(f"Search error: {e}")
@@ -54,20 +80,20 @@ class DocuRAG:
         """
         Filter chunks - remove those with less than 100 characters.
         """
-        filtered_docs = []
-        for doc in documents:
-            content = doc.get("content", "")
-            if len(content.strip()) >= 100:
-                filtered_docs.append(doc)
+        # Use list comprehension for better performance
+        filtered_docs = [doc for doc in documents if len(doc.get("content", "").strip()) >= 100]
         
         print(f"Filtered from {len(documents)} to {len(filtered_docs)} chunks")
         return filtered_docs
     
-    def extract_content_with_context(self, documents: List[Dict[str, Any]], keyword: str) -> List[Dict[str, Any]]:
+    def extract_content_with_context(self, documents: List[Dict[str, Any]], keyword: str, intent_action: str = None) -> List[Dict[str, Any]]:
         """
         Extract content with context around the keyword for each document.
+        For addition operations, provide full document content when keyword is not found.
         """
         content_extracts = []
+        keyword_lower = keyword.lower()
+        keyword_words = keyword_lower.split()
         
         for doc in documents:
             content = doc.get("content", "")
@@ -75,28 +101,22 @@ class DocuRAG:
             title = doc.get("title", "")
             
             # Find the keyword in the content
-            keyword_lower = keyword.lower()
             content_lower = content.lower()
             
+            # Check for exact keyword match first
             if keyword_lower in content_lower:
-                # Find the position of the keyword
                 start_pos = content_lower.find(keyword_lower)
-                
-                # Extract context around the keyword 
-                context_start = max(0, start_pos - 500)
-                context_end = min(len(content), start_pos + len(keyword) + 500)
-                
-                # Extract the context
+                context_size = 300 if intent_action == "add" else 400
+                context_start = max(0, start_pos - context_size)
+                context_end = min(len(content), start_pos + len(keyword) + context_size)
                 context = content[context_start:context_end]
                 
-                # Find the actual keyword in the original case
+                # Find the actual keyword with original case
                 keyword_pattern = re.compile(re.escape(keyword), re.IGNORECASE)
                 match = keyword_pattern.search(context)
                 
                 if match:
-                    # Get the actual keyword with original case
                     actual_keyword = context[match.start():match.end()]
-                    
                     content_extracts.append({
                         "document_id": doc_id,
                         "title": title,
@@ -107,6 +127,63 @@ class DocuRAG:
                         "url": doc.get("url", ""),
                         "source_url": doc.get("source_url", "")
                     })
+            # Check for partial keyword matches
+            elif len(keyword_words) > 1:
+                # Find the best matching word position
+                best_match_pos = -1
+                best_match_word = ""
+                
+                for word in keyword_words:
+                    if word in content_lower:
+                        pos = content_lower.find(word)
+                        if best_match_pos == -1 or pos < best_match_pos:
+                            best_match_pos = pos
+                            best_match_word = word
+                
+                if best_match_pos != -1:
+                    context_size = 300 if intent_action == "add" else 400
+                    context_start = max(0, best_match_pos - context_size)
+                    context_end = min(len(content), best_match_pos + len(best_match_word) + context_size)
+                    context = content[context_start:context_end]
+                    
+                    content_extracts.append({
+                        "document_id": doc_id,
+                        "title": title,
+                        "content": context,
+                        "keyword": keyword,
+                        "keyword_position": best_match_pos - context_start,
+                        "full_content": content,
+                        "url": doc.get("url", ""),
+                        "source_url": doc.get("source_url", "")
+                    })
+            # For addition operations, provide full content when no keyword found
+            elif intent_action == "add":
+                content_extracts.append({
+                    "document_id": doc_id,
+                    "title": title,
+                    "content": content,  # Use full content for additions
+                    "keyword": keyword,
+                    "keyword_position": -1,  # Indicates keyword not found
+                    "full_content": content,
+                    "url": doc.get("url", ""),
+                    "source_url": doc.get("source_url", "")
+                })
+            # For other operations, still include documents with partial relevance
+            else:
+                # Use the first part of the content as context
+                context_size = 400
+                context = content[:context_size] if len(content) > context_size else content
+                
+                content_extracts.append({
+                    "document_id": doc_id,
+                    "title": title,
+                    "content": context,
+                    "keyword": keyword,
+                    "keyword_position": -1,  # Indicates keyword not found in context
+                    "full_content": content,
+                    "url": doc.get("url", ""),
+                    "source_url": doc.get("source_url", "")
+                })
         
         return content_extracts
     
@@ -125,7 +202,7 @@ class DocuRAG:
             
             # Search documents
             print("Step 2: Searching documents...")
-            documents = await self.search_documents(keyword)
+            documents = await self.search_documents(keyword, intent.action)
             
             # Filter chunks
             print("Step 3: Filtering chunks...")
@@ -133,7 +210,7 @@ class DocuRAG:
             
             # Extract content with context
             print("Step 4: Extracting content with context...")
-            content_extracts = self.extract_content_with_context(filtered_docs, keyword)
+            content_extracts = self.extract_content_with_context(filtered_docs, keyword, intent.action)
             
             # Process intent using appropriate handler
             print("Step 5: Processing intent with handler...")

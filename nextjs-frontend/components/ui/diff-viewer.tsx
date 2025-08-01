@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { FileText, Minus, Plus } from 'lucide-react';
 
 interface DiffViewerProps {
@@ -8,9 +7,8 @@ interface DiffViewerProps {
   newContent: string;
   fileTitle: string;
   section: string;
-  changeType: 'add' | 'remove' | 'modify' | 'replace';
-  reasoning?: string;
-  confidence: number;
+  changeType: 'add' | 'delete' | 'modify' | 'replace';
+  confidence?: number;
 }
 
 export function DiffViewer({
@@ -19,7 +17,6 @@ export function DiffViewer({
   fileTitle,
   section,
   changeType,
-  reasoning,
   confidence
 }: DiffViewerProps) {
   // Enhanced diff algorithm to highlight word-level changes
@@ -76,9 +73,9 @@ export function DiffViewer({
   };
 
   // Function to highlight word-level differences
-  const highlightDifferences = (text: string, compareText: string, type: 'added' | 'removed') => {
-    const words = text.split(/(\s+)/);
-    const compareWords = compareText.split(/(\s+)/);
+  const highlightDifferences = (text: string | undefined, compareText: string | undefined, type: 'added' | 'removed') => {
+    const words = text ? text.split(/(\s+)/) : [];
+    const compareWords = compareText ? compareText.split(/(\s+)/) : [];
     
     return words.map((word, index) => {
       const compareWord = compareWords[index];
@@ -91,17 +88,7 @@ export function DiffViewer({
     }).join('');
   };
 
-  const diff = originalContent ? generateDiff(originalContent, newContent) : [];
-
-  const getChangeTypeColor = (type: string) => {
-    switch (type) {
-      case 'add': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'remove': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'modify': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'replace': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-    }
-  };
+  const diff = originalContent ? generateDiff(originalContent, newContent || '') : [];
 
   const getDiffLineColor = (type: string) => {
     switch (type) {
@@ -124,112 +111,84 @@ export function DiffViewer({
   return (
     <Card className="border border-gray-200 dark:border-gray-600">
       <CardContent className="pt-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2">
-            <FileText className="h-4 w-4 text-gray-500" />
-            <span className="font-medium text-gray-900 dark:text-white">
-              {fileTitle}
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Badge className={getChangeTypeColor(changeType)}>
-              {changeType}
-            </Badge>
-            <Badge variant="outline">
-              {Math.round(confidence * 100)}% confidence
-            </Badge>
-          </div>
-        </div>
-        
-        <div className="space-y-3">
-          <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Section: </span>
-            <span className="text-sm text-gray-600 dark:text-gray-400">{section}</span>
+        {/* Diff View */}
+        <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+          <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-600">
+            <div className="grid grid-cols-2 gap-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span>Current Content</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span>{changeType === 'delete' ? 'After Deletion' : 'New Content'}</span>
+              </div>
+            </div>
           </div>
           
-          {/* Diff View */}
-          <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-600">
-              <div className="grid grid-cols-2 gap-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span>Current Content</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span>New Content</span>
-                </div>
+          <div className="grid grid-cols-2 gap-0">
+            {/* Current Content (Red) */}
+            <div className="bg-red-50 dark:bg-red-900/10 p-4">
+              <div className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                Current Content
               </div>
+              {originalContent ? (
+                <div className="space-y-1">
+                  {diff.map((line, index) => (
+                    <div
+                      key={index}
+                      className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)}`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        {getDiffIcon(line.type)}
+                        <span 
+                          className="break-all"
+                          dangerouslySetInnerHTML={{ 
+                            __html: line.highlightedOriginal || line.originalLine || '' 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                  No existing content
+                </div>
+              )}
             </div>
             
-            <div className="grid grid-cols-2 gap-0">
-              {/* Current Content (Red) */}
-              <div className="bg-red-50 dark:bg-red-900/10 p-4">
-                <div className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
-                  Current Content
-                </div>
-                                 {originalContent ? (
-                   <div className="space-y-1">
-                     {diff.map((line, index) => (
-                       <div
-                         key={index}
-                         className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)}`}
-                       >
-                                                 <div className="flex items-center space-x-2">
-                          {getDiffIcon(line.type)}
-                          <span 
-                            className="break-all"
-                            dangerouslySetInnerHTML={{ 
-                              __html: line.highlightedOriginal || line.originalLine || '' 
-                            }}
-                          />
-                        </div>
-                       </div>
-                     ))}
-                   </div>
-                 ) : (
-                   <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                     No existing content
-                   </div>
-                 )}
+            {/* New Content (Green) */}
+            <div className="bg-green-50 dark:bg-green-900/10 p-4">
+              <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
+                {changeType === 'delete' ? 'After Deletion' : 'New Content'}
               </div>
-              
-              {/* New Content (Green) */}
-              <div className="bg-green-50 dark:bg-green-900/10 p-4">
-                <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
-                  New Content
+              {changeType === 'delete' && (!newContent || newContent.trim() === '') ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                  Content will be completely removed
                 </div>
-                                 <div className="space-y-1">
-                   {diff.map((line, index) => (
-                     <div
-                       key={index}
-                       className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)}`}
-                     >
-                                               <div className="flex items-center space-x-2">
-                          {getDiffIcon(line.type)}
-                          <span 
-                            className="break-all"
-                            dangerouslySetInnerHTML={{ 
-                              __html: line.highlightedNew || line.newLine || '' 
-                            }}
-                          />
-                        </div>
-                     </div>
-                   ))}
-                 </div>
-              </div>
+              ) : (
+                <div className="space-y-1">
+                  {diff.map((line, index) => (
+                    <div
+                      key={index}
+                      className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)}`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        {getDiffIcon(line.type)}
+                        <span 
+                          className="break-all"
+                          dangerouslySetInnerHTML={{ 
+                            __html: line.highlightedNew || line.newLine || '' 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-          
-          {/* Reasoning */}
-          {reasoning && (
-            <div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Reasoning: </span>
-              <span className="text-sm text-gray-600 dark:text-gray-400">{reasoning}</span>
-            </div>
-          )}
-          
-
         </div>
       </CardContent>
     </Card>

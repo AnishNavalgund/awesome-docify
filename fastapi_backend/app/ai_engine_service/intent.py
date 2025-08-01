@@ -8,14 +8,14 @@ from langchain.output_parsers import PydanticOutputParser
 from app.schemas import Intent, DocumentUpdate, ContentChange
 from app.config import settings
 from app.utils import logger_info
-from .prompts import INTENT_EXTRACTION_PROMPT, CONTENT_CHANGE_PROMPT
+from .prompts import INTENT_EXTRACTION_PROMPT, UNIFIED_CONTENT_PROMPT
 from langchain_core.exceptions import OutputParserException
 
 
 # Initialize LLM for intent extraction
 llm = ChatOpenAI(
-    model="gpt-4o-mini",  
-    temperature=0.2,
+    model="gpt-4o",  
+    temperature=0.3,
     openai_api_key=settings.OPENAI_API_KEY
 )
 
@@ -83,19 +83,21 @@ class BaseIntentHandler(ABC):
         return doc_name
 
 
-class ModifyIntentHandler(BaseIntentHandler):
-    """Handler for modify intent"""
+class UnifiedIntentHandler(BaseIntentHandler):
+    """Handler for all intent types (add, delete, modify)"""
     
     async def process_intent(self, intent: Intent, query: str, content_extracts: List[Dict[str, Any]]) -> List[DocumentUpdate]:
-        """Process modify intent and return document updates"""
-
-        
+        """Process any intent and return document updates"""
         documents_to_update = []
+        
+        # Limit the number of documents to process to prevent timeout
+        max_documents = 5
+        content_extracts = content_extracts[:max_documents]
         
         for extract in content_extracts:
             try:
                 # Create a prompt for the LLM to generate changes
-                formatted_prompt = CONTENT_CHANGE_PROMPT.format_messages(
+                formatted_prompt = UNIFIED_CONTENT_PROMPT.format_messages(
                     query=query,
                     keyword=intent.target,
                     content=extract['content']
@@ -111,12 +113,11 @@ class ModifyIntentHandler(BaseIntentHandler):
                     
                     documents_to_update.append(DocumentUpdate(
                         file=doc_name,
-                        action="modify",
-                        reason=f"Update {intent.target} based on user query",
+                        action=intent.action,
+                        reason=f"{intent.action.capitalize()} {intent.target} based on user query",
                         section=intent.object_type or "Content",
                         original_content=change_data.original_content,
-                        new_content=change_data.new_content,
-                        confidence=0.8
+                        new_content=change_data.new_content
                     ))
                         
                 except OutputParserException as e:
@@ -124,12 +125,11 @@ class ModifyIntentHandler(BaseIntentHandler):
                     doc_name = self._get_document_name(extract)
                     documents_to_update.append(DocumentUpdate(
                         file=doc_name,
-                        action="modify",
-                        reason=f"Update {intent.target} based on user query",
+                        action=intent.action,
+                        reason=f"{intent.action.capitalize()} {intent.target} based on user query (fallback)",
                         section=intent.object_type or "Content",
                         original_content=extract["content"],
-                        new_content=extract["content"].replace(intent.target, f"UPDATED_{intent.target}"),
-                        confidence=0.7
+                        new_content=extract["content"],
                     ))
                     
             except Exception as e:
@@ -138,12 +138,11 @@ class ModifyIntentHandler(BaseIntentHandler):
                 doc_name = self._get_document_name(extract)
                 documents_to_update.append(DocumentUpdate(
                     file=doc_name,
-                    action="modify",
+                    action=intent.action,
                     reason=f"Error generating changes: {str(e)}",
                     section=intent.object_type or "Content",
                     original_content=extract["content"],
-                    new_content=extract["content"],
-                    confidence=0.5
+                    new_content=extract["content"]
                 ))
         
         return documents_to_update
@@ -154,8 +153,5 @@ class IntentHandlerFactory:
     
     @staticmethod
     def create_handler(intent: Intent, llm_model) -> BaseIntentHandler:
-        """Create the appropriate handler based on intent action"""
-        if intent.action == "modify":
-            return ModifyIntentHandler(llm_model)
-        else:
-            raise ValueError(f"Unknown intent action: {intent.action}")
+        """Create the unified handler for all operations"""
+        return UnifiedIntentHandler(llm_model)

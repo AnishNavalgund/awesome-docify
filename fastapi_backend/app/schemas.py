@@ -10,12 +10,11 @@ class QueryRequest(BaseModel):
 class DocumentUpdate(BaseModel):
     """Represents a document that needs to be updated"""
     file: str = Field(..., description="Document file name")
-    action: Literal["add", "remove", "modify"] = Field(..., description="Type of action needed")
+    action: Literal["add", "delete", "modify"] = Field(..., description="Type of action needed")
     reason: str = Field(..., description="Why this document needs to be updated")
     section: Optional[str] = Field(None, description="Specific section that needs changes")
     original_content: Optional[str] = Field(None, description="Original content from the document")
     new_content: Optional[str] = Field(None, description="Suggested new content")
-    confidence: Optional[float] = Field(None, description="Confidence score for the suggested change")
     line_numbers: Optional[List[int]] = Field(None, description="Line numbers where changes should be made")
 
 class QueryResponse(BaseModel):
@@ -60,7 +59,7 @@ class JSONFileContentResponse(BaseModel):
 # ---------- Service MODELS ----------
 
 class Intent(BaseModel):
-    action: Literal["add", "remove", "modify"]
+    action: Literal["add", "delete", "modify"]
     target: str = Field(..., description="The function/class/section to act on")
     file: Optional[str] = Field(None, description="Optional file name (e.g. 'vector_store.py')")
     object_type: Optional[Literal["function", "class", "section", "line"]] = Field(
