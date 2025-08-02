@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
@@ -21,13 +21,15 @@ async def load_documents_from_dir(directory: str):
             data = json.loads(file.read_text(encoding="utf-8"))
             markdown = data.get("markdown", "")
             metadata = data.get("metadata", {})
-            if metadata.get("language", "en") != "en":
-                continue  # skip non-English
+
+            if metadata.get("language", "en") != "en" or not markdown.strip():
+                continue  # Skip non-English or empty docs
 
             metadata.update({
                 "file_path": str(file),
                 "file_size": file.stat().st_size,
-                "last_modified": datetime.fromtimestamp(file.stat().st_mtime).isoformat()
+                "last_modified": datetime.fromtimestamp(file.stat().st_mtime).isoformat(),
+                "title": metadata.get("title") or file.stem.replace("_", " ").title()
             })
 
             docs.append(Document(page_content=markdown, metadata=metadata))
@@ -37,12 +39,35 @@ async def load_documents_from_dir(directory: str):
 
 # === Step 2: Chunk Text ===
 async def chunk_documents(docs):
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=settings.CHUNK_SIZE,
-        chunk_overlap=settings.CHUNK_OVERLAP,
+    all_chunks = []
+
+    # Step 1: Setup
+    header_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=[("#", "h1"), ("##", "h2"), ("###", "h3")]
+    )
+    recursive_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=150,
         separators=["\n\n", "\n", ". ", " ", ""]
     )
-    return splitter.split_documents(docs)
+
+    # Step 2: Split each document
+    for doc in docs:
+        header_chunks = header_splitter.split_text(doc.page_content)
+
+        for chunk in header_chunks:
+            # Attach original metadata
+            chunk.metadata.update(doc.metadata)
+
+            # Step 3: If too long, further split recursively
+            if len(chunk.page_content) > 2000:  # Can replace with token count if needed
+                sub_chunks = recursive_splitter.split_text(chunk.page_content)
+                for sub in sub_chunks:
+                    all_chunks.append(Document(page_content=sub, metadata=chunk.metadata.copy()))
+            else:
+                all_chunks.append(chunk)
+
+    return all_chunks
 
 # === Step 3: Embed & Store in Qdrant ===
 async def ingest_to_qdrant(docs):

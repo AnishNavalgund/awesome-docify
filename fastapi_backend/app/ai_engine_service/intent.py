@@ -1,50 +1,33 @@
-"""
-Intent extraction and processing for different types of operations (modify, delete, add)
-"""
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain.output_parsers import PydanticOutputParser
+from langchain_core.exceptions import OutputParserException
+from langchain_core.documents import Document
+
 from app.schemas import Intent, DocumentUpdate, ContentChange
 from app.config import settings
 from app.utils import logger_info
 from .prompts import INTENT_EXTRACTION_PROMPT, UNIFIED_CONTENT_PROMPT
-from langchain_core.exceptions import OutputParserException
+
+# Initialize shared LLM and parsers
+llm = ChatOpenAI(model=settings.LLM_MODEL, temperature=settings.LLM_TEMPERATURE, openai_api_key=settings.OPENAI_API_KEY)    
+intent_parser = PydanticOutputParser(pydantic_object=Intent)
+content_parser = PydanticOutputParser(pydantic_object=ContentChange)
 
 
-# Initialize LLM for intent extraction
-llm = ChatOpenAI(
-    model="gpt-4o",  
-    temperature=0.3,
-    openai_api_key=settings.OPENAI_API_KEY
-)
-
-# Define the parser for Pydantic Intent
-parser = PydanticOutputParser(pydantic_object=Intent)
-
-# Define the parser for Content Change
-content_change_parser = PydanticOutputParser(pydantic_object=ContentChange)
-
-
-async def extract_intent(user_query: str) -> Intent:
-    """
-    Extract a structured Intent object from the user query using LangChain + OpenAI + Pydantic.
-    """
-    formatted_prompt = INTENT_EXTRACTION_PROMPT.format_messages(
-        query=user_query,
-        format_instructions=parser.get_format_instructions()
+async def extract_intent(query: str) -> Intent:
+    prompt = INTENT_EXTRACTION_PROMPT.format_messages(
+        query=query, format_instructions=intent_parser.get_format_instructions()
     )
-
     try:
-        response = await llm.ainvoke(formatted_prompt)
-        logger_info.info(f"LLM Call successful")
-        return parser.parse(response.content)
+        response = await llm.ainvoke(prompt)
+        logger_info.info("LLM Call successful")
+        return intent_parser.parse(response.content)
     except Exception as e:
-        # Check if it's an API key error
         if "invalid_api_key" in str(e).lower() or "401" in str(e):
-            raise ValueError(f"OpenAI API key error: Please check your API key configuration. Error: {e}")
-        else:
-            raise ValueError(f"Failed to extract intent: {e}")
+            raise ValueError(f"Invalid OpenAI API key: {e}")
+        raise ValueError(f"Intent extraction failed: {e}")
 
 
 class BaseIntentHandler(ABC):
@@ -54,7 +37,7 @@ class BaseIntentHandler(ABC):
         self.llm_model = llm_model
     
     @abstractmethod
-    async def process_intent(self, intent: Intent, query: str, content_extracts: List[Dict[str, Any]]) -> List[DocumentUpdate]:
+    async def process_intent(self, intent: Intent, query: str, content_extracts: List[Document]) -> List[DocumentUpdate]:
         """Process the intent and return document updates"""
         pass
     
@@ -86,31 +69,39 @@ class BaseIntentHandler(ABC):
 class UnifiedIntentHandler(BaseIntentHandler):
     """Handler for all intent types (add, delete, modify)"""
     
-    async def process_intent(self, intent: Intent, query: str, content_extracts: List[Dict[str, Any]]) -> List[DocumentUpdate]:
+    async def process_intent(self, intent: Intent, query: str, content_extracts: List[Document]) -> List[DocumentUpdate]:
         """Process any intent and return document updates"""
         documents_to_update = []
         
-        # Limit the number of documents to process to prevent timeout
-        max_documents = 5
-        content_extracts = content_extracts[:max_documents]
+        if not content_extracts:
+            return []
         
-        for extract in content_extracts:
+        # Combine all documents into one context for single LLM call
+        combined_context = "\n\n--- DOCUMENT SEPARATOR ---\n\n".join([
+            f"Document: {self._get_document_name(doc.metadata)}\nContent: {doc.page_content}"
+            for doc in content_extracts
+        ])
+        
+        try:
+            formatted_prompt = UNIFIED_CONTENT_PROMPT.format_messages(
+                query=query,
+                keyword=intent.target,
+                content=combined_context
+            )
+            
+            response = await self.llm_model.ainvoke(formatted_prompt)
+            
+            # Print response for DELETE operations
+            if intent.action == "delete":
+                print(f"DELETE operation - LLM response: {response.content}")
+            
+            # Parse the response and create updates for all documents
             try:
-                # Create a prompt for the LLM to generate changes
-                formatted_prompt = UNIFIED_CONTENT_PROMPT.format_messages(
-                    query=query,
-                    keyword=intent.target,
-                    content=extract['content']
-                )
+                change_data = content_parser.parse(response.content)
                 
-                response = await self.llm_model.ainvoke(formatted_prompt)
-                
-                # Use LangChain's structured output parsing
-                try:
-                    change_data = content_change_parser.parse(response.content)
-                    
-                    doc_name = self._get_document_name(extract)
-                    
+                # Create one update per document with the same response
+                for doc in content_extracts:
+                    doc_name = self._get_document_name(doc.metadata)
                     documents_to_update.append(DocumentUpdate(
                         file=doc_name,
                         action=intent.action,
@@ -119,34 +110,38 @@ class UnifiedIntentHandler(BaseIntentHandler):
                         original_content=change_data.original_content,
                         new_content=change_data.new_content
                     ))
+                
+                return documents_to_update
                         
-                except OutputParserException as e:
-                    # Fallback if parsing fails
-                    doc_name = self._get_document_name(extract)
+            except OutputParserException as e:
+                # Fallback if parsing fails - create updates with original content
+                for doc in content_extracts:
+                    doc_name = self._get_document_name(doc.metadata)
                     documents_to_update.append(DocumentUpdate(
                         file=doc_name,
                         action=intent.action,
                         reason=f"{intent.action.capitalize()} {intent.target} based on user query (fallback)",
                         section=intent.object_type or "Content",
-                        original_content=extract["content"],
-                        new_content=extract["content"],
+                        original_content=doc.page_content,
+                        new_content=doc.page_content,
                     ))
-                    
-            except Exception as e:
-                print(f"Error generating changes for document {extract.get('document_id', 'unknown')}: {e}")
-                # Fallback change
-                doc_name = self._get_document_name(extract)
+                return documents_to_update
+                
+        except Exception as e:
+            print(f"Error generating changes: {e}")
+            # Fallback change - create updates with original content
+            for doc in content_extracts:
+                doc_name = self._get_document_name(doc.metadata)
                 documents_to_update.append(DocumentUpdate(
                     file=doc_name,
                     action=intent.action,
                     reason=f"Error generating changes: {str(e)}",
                     section=intent.object_type or "Content",
-                    original_content=extract["content"],
-                    new_content=extract["content"]
+                    original_content=doc.page_content,
+                    new_content=doc.page_content
                 ))
-        
-        return documents_to_update
-
+            return documents_to_update
+    
 
 class IntentHandlerFactory:
     """Factory to create appropriate intent handlers"""

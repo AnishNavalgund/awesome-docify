@@ -11,13 +11,22 @@ class Settings(BaseSettings):
     # OpenAI settings
     OPENAI_API_KEY: str
     
+    # LLM Model settings
+    LLM_MODEL: str = "gpt-4o"
+    LLM_TEMPERATURE: float = 0.2
+    LLM_MAX_TOKENS: int = 1024
+    
+    # RAG settings
+    TOP_K_DOCS: int = 5          # Reduced for precision
+    MIN_CHARS_PER_CHUNK: int = 100
+    
     # Qdrant settings
     QDRANT_PATH: str = "../local-shared-data/qdrant"
     QDRANT_COLLECTION_NAME: str = "openai_docs"
 
     # Document loader settings
     DOCUMENT_LOADER_DIR: str = "../local-shared-data/docs"
-    
+
     # Document chunking settings
     CHUNK_SIZE: int = 4000
     CHUNK_OVERLAP: int = 200

@@ -66,11 +66,12 @@ async def startup_event():
                 qdrant_client.close()
         
         if has_documents:
-            print("Documents already ingested, skipping ingestion")
+            print("Documents already ingested, skipping ingestion!")
         else:
             print("No documents found in collection, starting ingestion...")
             # Load and ingest documents using the ingest functions
             docs = await load_documents_from_dir(settings.DOCUMENT_LOADER_DIR)
+            print(f"Loaded {len(docs)} documents in english language only")
             if docs:
                 chunked_docs = await chunk_documents(docs)
                 await ingest_to_qdrant(chunked_docs)
