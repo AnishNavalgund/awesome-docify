@@ -5,10 +5,11 @@ from app.routes import query
 from app.routes import debug
 from app.utils import simple_generate_unique_route_id
 from app.database import create_db_and_tables
-from app.data_ingestion_service import vector_store, document_loader
+from app.data_ingestion_service import load_documents_from_dir, chunk_documents, ingest_to_qdrant
 from openai import OpenAI
 from pathlib import Path
 from app.utils import logger_info, logger_error
+from qdrant_client import QdrantClient
 
 app = FastAPI(
     title="awesome-docify",
@@ -41,17 +42,41 @@ app.include_router(debug.router)
 # Startup logic
 @app.on_event("startup")
 async def startup_event():
-    await create_db_and_tables()
+    # Skip database initialization since no models are defined
+    # await create_db_and_tables()
+    
     try:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         client.models.list()
-        logger_info.info("OpenAI API key is valid")
-        await vector_store.create_collection()
-        collection_info = await vector_store.get_collection_info()
-        if collection_info.get("points_count", 0) == 0:
-            docs_dir = "../local-shared-data/docs"
-            if Path(docs_dir).exists():
-                logger_info.info(f"Vector store is empty. Ingesting from {docs_dir}...")
-                await document_loader.ingest_documents(docs_dir)
+        print("OpenAI API key is valid")
+        
+        # Check if chunks are already ingested using local Qdrant
+        qdrant_client = None
+        try:
+            qdrant_client = QdrantClient(path=settings.QDRANT_PATH)
+            collection_info = qdrant_client.get_collection(settings.QDRANT_COLLECTION_NAME)
+            points_count = collection_info.points_count
+            print(f"Collection '{settings.QDRANT_COLLECTION_NAME}' has {points_count} documents")
+            has_documents = points_count > 0
+        except Exception as e:
+            print(f"Collection check failed: {e}")
+            has_documents = False
+        finally:
+            if qdrant_client:
+                qdrant_client.close()
+        
+        if has_documents:
+            print("Documents already ingested, skipping ingestion")
+        else:
+            print("No documents found in collection, starting ingestion...")
+            # Load and ingest documents using the ingest functions
+            docs = await load_documents_from_dir(settings.DOCUMENT_LOADER_DIR)
+            if docs:
+                chunked_docs = await chunk_documents(docs)
+                await ingest_to_qdrant(chunked_docs)
+                print("Document ingestion completed")
+            else:
+                print("No documents found to ingest")
+            
     except Exception as e:
-        logger_error.error(f"Startup warning: {e}")
+        print(f"Startup warning: {e}")

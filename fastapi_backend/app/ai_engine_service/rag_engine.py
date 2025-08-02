@@ -1,24 +1,22 @@
 from app.schemas import Intent, DocumentUpdate
-from app.data_ingestion_service import vector_store
 from app.ai_engine_service.intent import extract_intent, IntentHandlerFactory
 from langchain_openai import ChatOpenAI
+from langchain_qdrant import QdrantVectorStore
+from langchain_openai import OpenAIEmbeddings
+from qdrant_client import QdrantClient
 from app.config import settings
-from app.utils import logger_info
+from app.utils import logger_info, logger_error
 import warnings
 from typing import List, Dict, Any
 import re
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
 class DocuRAG:
-    """
-    Awesome Docuemnt RAG
-    """
+    """Awesome Document RAG using local file-based Qdrant"""
     
-    def __init__(self, 
-                 llm_model: ChatOpenAI = None,
-                 top_k_docs: int = 50):  # Increased to get more results
-        
+    def __init__(self, llm_model: ChatOpenAI = None, top_k_docs: int = 50):
         self.llm_model = llm_model or ChatOpenAI(
             model="gpt-4o",
             temperature=0.3,
@@ -26,84 +24,81 @@ class DocuRAG:
         )
         self.top_k_docs = top_k_docs
         
+        # Initialize embeddings
+        self.embeddings = OpenAIEmbeddings(
+            model=settings.EMBEDDING_MODEL,
+            openai_api_key=settings.OPENAI_API_KEY
+        )
+        
+        # Store path and collection name, but don't create client yet
+        self.qdrant_path = Path(settings.QDRANT_PATH)
+        self.collection_name = settings.QDRANT_COLLECTION_NAME
+        self._client = None
+        
+    def _get_client(self):
+        """Get or create Qdrant client"""
+        if self._client is None:
+            self._client = QdrantClient(path=str(self.qdrant_path))
+        return self._client
+        
     async def search_documents(self, keyword: str, intent_action: str = None) -> List[Dict[str, Any]]:
-        """
-        Search for documents containing the exact keyword or related content for additions.
-        """
+        """Search for documents using local Qdrant"""
         try:
-            print(f"Searching for keyword: {keyword} with action: {intent_action}")
+            print(f"Searching for keyword: {keyword}")
             
-            # Optimize initial search limit based on operation type
-            initial_limit = 50 if intent_action == "add" else 30
-            results = await vector_store.search(query=keyword, limit=initial_limit)
-            print(f"Found {len(results)} initial results")
+            # Get client when needed
+            client = self._get_client()
             
-            # Filter to include documents that contain the keyword or related terms
-            keyword_matches = []
-            keyword_lower = keyword.lower()
-            keyword_words = keyword_lower.split()
+            # Connect to existing Qdrant collection
+            vector_store = QdrantVectorStore(
+                client=client,
+                collection_name=self.collection_name,
+                embedding=self.embeddings
+            )
             
-            for doc in results:
-                content = doc.get("content", "").lower()
-                
-                # Check for exact keyword match
-                if keyword_lower in content:
-                    keyword_matches.append(doc)
-                # Check for partial matches (at least 2 words from the keyword)
-                elif len(keyword_words) > 1:
-                    word_matches = sum(1 for word in keyword_words if word in content)
-                    if word_matches >= min(2, len(keyword_words)):
-                        keyword_matches.append(doc)
-                # For single word keywords, check for partial matches
-                elif len(keyword_words) == 1 and len(keyword_lower) > 3:
-                    # Check if the word appears as part of other words
-                    if any(keyword_lower in word for word in content.split()):
-                        keyword_matches.append(doc)
+            # Search using Qdrant
+            docs_and_scores = vector_store.similarity_search_with_score(
+                keyword, k=self.top_k_docs
+            )
             
-            print(f"Found {len(keyword_matches)} documents with keyword match")
+            # Format results
+            results = []
+            for doc, score in docs_and_scores:
+                results.append({
+                    "score": score,
+                    "title": doc.metadata.get("title", ""),
+                    "url": doc.metadata.get("url", ""),
+                    "content": doc.page_content,
+                    "source_url": doc.metadata.get("source_url", ""),
+                    "document_id": doc.metadata.get("document_id", ""),
+                    "chunk_index": doc.metadata.get("chunk_index", 0)
+                })
             
-            # For addition operations, if no matches found, get some general content
-            if intent_action == "add" and len(keyword_matches) == 0:
-                print("No matches found for addition, getting general content...")
-                # Get some general documentation content for the LLM to work with
-                general_results = await vector_store.search(query="documentation", limit=3)
-                keyword_matches = general_results
-                print(f"Found {len(keyword_matches)} general documents for addition")
-            
-            return keyword_matches
+            print(f"Found {len(results)} documents")
+            return results
             
         except Exception as e:
             print(f"Search error: {e}")
             return []
     
     def filter_chunks(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Filter chunks - remove those with less than 100 characters.
-        """
-        # Use list comprehension for better performance
+        """Filter chunks - remove those with less than 100 characters"""
         filtered_docs = [doc for doc in documents if len(doc.get("content", "").strip()) >= 100]
-        
         print(f"Filtered from {len(documents)} to {len(filtered_docs)} chunks")
         return filtered_docs
     
     def extract_content_with_context(self, documents: List[Dict[str, Any]], keyword: str, intent_action: str = None) -> List[Dict[str, Any]]:
-        """
-        Extract content with context around the keyword for each document.
-        For addition operations, provide full document content when keyword is not found.
-        """
+        """Extract content with context around the keyword"""
         content_extracts = []
         keyword_lower = keyword.lower()
-        keyword_words = keyword_lower.split()
         
         for doc in documents:
             content = doc.get("content", "")
             doc_id = doc.get("document_id", "")
             title = doc.get("title", "")
             
-            # Find the keyword in the content
+            # Find keyword in content
             content_lower = content.lower()
-            
-            # Check for exact keyword match first
             if keyword_lower in content_lower:
                 start_pos = content_lower.find(keyword_lower)
                 context_size = 300 if intent_action == "add" else 400
@@ -111,7 +106,7 @@ class DocuRAG:
                 context_end = min(len(content), start_pos + len(keyword) + context_size)
                 context = content[context_start:context_end]
                 
-                # Find the actual keyword with original case
+                # Find actual keyword with original case
                 keyword_pattern = re.compile(re.escape(keyword), re.IGNORECASE)
                 match = keyword_pattern.search(context)
                 
@@ -127,59 +122,28 @@ class DocuRAG:
                         "url": doc.get("url", ""),
                         "source_url": doc.get("source_url", "")
                     })
-            # Check for partial keyword matches
-            elif len(keyword_words) > 1:
-                # Find the best matching word position
-                best_match_pos = -1
-                best_match_word = ""
-                
-                for word in keyword_words:
-                    if word in content_lower:
-                        pos = content_lower.find(word)
-                        if best_match_pos == -1 or pos < best_match_pos:
-                            best_match_pos = pos
-                            best_match_word = word
-                
-                if best_match_pos != -1:
-                    context_size = 300 if intent_action == "add" else 400
-                    context_start = max(0, best_match_pos - context_size)
-                    context_end = min(len(content), best_match_pos + len(best_match_word) + context_size)
-                    context = content[context_start:context_end]
-                    
-                    content_extracts.append({
-                        "document_id": doc_id,
-                        "title": title,
-                        "content": context,
-                        "keyword": keyword,
-                        "keyword_position": best_match_pos - context_start,
-                        "full_content": content,
-                        "url": doc.get("url", ""),
-                        "source_url": doc.get("source_url", "")
-                    })
             # For addition operations, provide full content when no keyword found
             elif intent_action == "add":
                 content_extracts.append({
                     "document_id": doc_id,
                     "title": title,
-                    "content": content,  # Use full content for additions
+                    "content": content,
                     "keyword": keyword,
-                    "keyword_position": -1,  # Indicates keyword not found
+                    "keyword_position": -1,
                     "full_content": content,
                     "url": doc.get("url", ""),
                     "source_url": doc.get("source_url", "")
                 })
-            # For other operations, still include documents with partial relevance
+            # For other operations, include first part as context
             else:
-                # Use the first part of the content as context
                 context_size = 400
                 context = content[:context_size] if len(content) > context_size else content
-                
                 content_extracts.append({
                     "document_id": doc_id,
                     "title": title,
                     "content": context,
                     "keyword": keyword,
-                    "keyword_position": -1,  # Indicates keyword not found in context
+                    "keyword_position": -1,
                     "full_content": content,
                     "url": doc.get("url", ""),
                     "source_url": doc.get("source_url", "")
@@ -188,12 +152,12 @@ class DocuRAG:
         return content_extracts
     
     async def task_runner(self, query: str) -> dict:
-
+        """Main task runner"""
         try:
             print(f"=== TASK ENTRY POINT ===")
             print(f"Query: {query}")
             
-            #  Extract keyword using Query Extractor Service
+            # Extract keyword
             print("Step 1: Extracting keyword...")
             intent = await extract_intent(query)
             print(f">>>> Intent: {intent}")
@@ -212,12 +176,12 @@ class DocuRAG:
             print("Step 4: Extracting content with context...")
             content_extracts = self.extract_content_with_context(filtered_docs, keyword, intent.action)
             
-            # Process intent using appropriate handler
+            # Process intent using handler
             print("Step 5: Processing intent with handler...")
             handler = IntentHandlerFactory.create_handler(intent, self.llm_model)
             documents_to_update = await handler.process_intent(intent, query, content_extracts)
             
-            print(f"Generated {len(documents_to_update)} document updates with content")
+            print(f"Generated {len(documents_to_update)} document updates")
             
             return {
                 "query": query,
@@ -243,8 +207,6 @@ class DocuRAG:
 task = DocuRAG()
 
 async def orchestrator(query: str) -> dict:
-    """
-    Main entry point
-    """
+    """Main entry point"""
     print(f"Query: {query}")
     return await task.task_runner(query)

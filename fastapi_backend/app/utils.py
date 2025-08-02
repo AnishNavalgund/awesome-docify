@@ -1,10 +1,15 @@
 import logging
 from fastapi.routing import APIRoute
 
-logger_info = logging.getLogger(__name__)
-logger_info.setLevel(logging.INFO)
-logger_error = logging.getLogger(__name__)
-logger_error.setLevel(logging.ERROR)
+# Configure logging to output to console
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Use root logger for simplicity
+logger_info = logging.getLogger()
+logger_error = logging.getLogger()
 
 def simple_generate_unique_route_id(route: APIRoute):
     # Handle routes without tags

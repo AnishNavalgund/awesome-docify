@@ -245,7 +245,7 @@ export default function Home() {
                 const currentContent = editableContent[docId] || doc.new_content || '';
                 
                 return (
-                  <Card key={`${doc.file}-${originalIndex}`} className="border-2 border-gray-200 dark:border-gray-700">
+                  <Card key={`${doc.file}-${visibleIndex}-${doc.action}`} className="border-2 border-gray-200 dark:border-gray-700">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
