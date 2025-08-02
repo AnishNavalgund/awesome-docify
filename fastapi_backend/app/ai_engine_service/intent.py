@@ -7,7 +7,7 @@ from langchain_core.documents import Document
 
 from app.schemas import Intent, DocumentUpdate, ContentChange
 from app.config import settings
-from app.utils import logger_info
+from app.utils import logger_info, logger_error
 from .prompts import INTENT_EXTRACTION_PROMPT, UNIFIED_CONTENT_PROMPT
 
 # Initialize shared LLM and parsers
@@ -128,7 +128,7 @@ class UnifiedIntentHandler(BaseIntentHandler):
                 return documents_to_update
                 
         except Exception as e:
-            print(f"Error generating changes: {e}")
+            logger_error.error(f"Error generating changes: {e}")
             # Fallback change - create updates with original content
             for doc in content_extracts:
                 doc_name = self._get_document_name(doc.metadata)

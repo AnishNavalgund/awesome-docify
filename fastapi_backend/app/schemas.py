@@ -25,14 +25,25 @@ class QueryResponse(BaseModel):
     total_documents: int = Field(..., description="Total number of documents that need updates")
 
 class SaveChangeRequest(BaseModel):
-    original_code: str = Field(..., description="Original code to be modified")
-    updated_code: str = Field(..., description="Updated code after modification")
-    diff: str = Field(..., description="Diff between original and updated code")
+    document_updates: List[DocumentUpdate] = Field(..., description="List of document updates to save")
     approved_by: str = Field(..., description="Name of the person who approved the change")
-    timestamp: datetime = Field(..., description="Timestamp of the change")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp of the change")
 
 class SaveChangeResponse(BaseModel):
     status: str = Field(..., description="Status of the change")
+    saved_count: int = Field(..., description="Number of changes saved")
+
+class SavedChange(BaseModel):
+    """Represents a saved change in memory"""
+    document_update: DocumentUpdate
+    approved_by: str
+    timestamp: datetime
+    status: str = "accepted"
+
+class GetSavedChangesResponse(BaseModel):
+    """Response for retrieving saved changes"""
+    saved_changes: List[SavedChange] = Field(..., description="List of saved changes")
+    total_count: int = Field(..., description="Total number of saved changes")
 
 class IngestRequest(BaseModel):
     docs_dir: str = Field(..., description="Directory containing JSON files to ingest")

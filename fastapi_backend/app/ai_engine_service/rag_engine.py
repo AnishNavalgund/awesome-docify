@@ -2,6 +2,7 @@ from app.schemas import Intent, DocumentUpdate, ContentChange
 from app.ai_engine_service.intent import extract_intent, UnifiedIntentHandler, IntentHandlerFactory
 from app.ai_engine_service.prompts import UNIFIED_CONTENT_PROMPT
 from app.config import settings
+from app.utils import logger_info, logger_error
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
@@ -83,7 +84,7 @@ class DocuRAG:
 
         except Exception as e:
             import traceback
-            print(f"Pipeline error: {e}")
+            logger_error.error(f"Pipeline error: {e}")
             print(traceback.format_exc())
             return {
                 "query": query,

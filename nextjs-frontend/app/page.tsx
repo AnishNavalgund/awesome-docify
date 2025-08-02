@@ -44,6 +44,9 @@ export default function Home() {
   const [reviewDecisions, setReviewDecisions] = useState<Record<string, 'approve' | 'reject' | 'modify'>>({});
   const [editableContent, setEditableContent] = useState<Record<string, string | undefined>>({});
   const [isEditing, setIsEditing] = useState<Record<string, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -145,6 +148,87 @@ export default function Home() {
         return newState;
       });
     }
+  };
+
+  const saveChanges = async () => {
+    if (!response) return;
+
+    setIsSaving(true);
+    setSaveStatus(null);
+
+    try {
+      // Get approved documents
+      const approvedDocuments = response.documents_to_update.filter((doc, index) => {
+        const decision = reviewDecisions[`doc-${index}`];
+        return decision === 'approve' || decision === 'modify';
+      });
+
+      if (approvedDocuments.length === 0) {
+        setSaveStatus('No changes to save');
+        return;
+      }
+
+      // Update documents with edited content if any
+      const documentsToSave = approvedDocuments.map((doc, index) => {
+        const docId = `doc-${response.documents_to_update.indexOf(doc)}`;
+        const editedContent = editableContent[docId];
+        
+        return {
+          ...doc,
+          new_content: editedContent || doc.new_content
+        };
+      });
+
+      const saveRequest = {
+        document_updates: documentsToSave,
+        approved_by: 'user@example.com' // You can make this dynamic later
+      };
+
+      const res = await fetch('/api/v1/save-change', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(saveRequest),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to save changes: ${res.status}`);
+      }
+
+      const saveResponse = await res.json();
+      setSaveStatus(`Successfully saved ${saveResponse.saved_count} changes!`);
+      
+      // Show confirmation popup instead of auto-clearing
+      setShowSaveConfirmation(true);
+      
+      // Clear the form after successful save
+      setTimeout(() => {
+        setResponse(null);
+        setReviewDecisions({});
+        setEditableContent({});
+        setIsEditing({});
+        setSaveStatus(null);
+      }, 2000);
+
+    } catch (err) {
+      console.error('Error saving changes:', err);
+      setSaveStatus(err instanceof Error ? err.message : 'Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const goToMainPage = () => {
+    // Reset all states to go back to main page
+    setResponse(null);
+    setReviewDecisions({});
+    setEditableContent({});
+    setIsEditing({});
+    setSaveStatus(null);
+    setShowSaveConfirmation(false);
+    setQuery('');
+    setError(null);
   };
 
   // Filter out rejected documents
@@ -364,15 +448,62 @@ export default function Home() {
             {/* Action Buttons */}
             <div className="flex justify-end space-x-4">
               <Button 
-                disabled={Object.keys(reviewDecisions).length === 0}
-                onClick={() => {
-                  // TODO: Implement save functionality
-                  console.log('Saving decisions:', reviewDecisions);
-                  console.log('Edited content:', editableContent);
-                }}
+                disabled={Object.keys(reviewDecisions).length === 0 || isSaving}
+                onClick={saveChanges}
               >
-                Save Changes
+                {isSaving ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
               </Button>
+            </div>
+
+            {/* Save Status */}
+            {saveStatus && (
+              <Card className={`mt-4 ${saveStatus.includes('Successfully') ? 'border-green-200 dark:border-green-800' : 'border-red-200 dark:border-red-800'}`}>
+                <CardContent className="pt-6">
+                  <div className={`flex items-center space-x-2 ${saveStatus.includes('Successfully') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {saveStatus.includes('Successfully') ? (
+                      <CheckCircle className="h-5 w-5" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5" />
+                    )}
+                    <span>{saveStatus}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Save Confirmation Popup */}
+        {showSaveConfirmation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="flex items-center space-x-3 mb-4">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Changes Saved Successfully!
+                </h3>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Your approved changes have been saved to the system. You can now return to the main page to make more updates.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <Button
+                  onClick={goToMainPage}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Go to Main Page
+                </Button>
+              </div>
             </div>
           </div>
         )}

@@ -59,7 +59,7 @@ async def startup_event():
             print(f"Collection '{settings.QDRANT_COLLECTION_NAME}' has {points_count} documents")
             has_documents = points_count > 0
         except Exception as e:
-            print(f"Collection check failed: {e}")
+            logger_error.error(f"Collection check failed: {e}")
             has_documents = False
         finally:
             if qdrant_client:
@@ -80,4 +80,4 @@ async def startup_event():
                 print("No documents found to ingest")
             
     except Exception as e:
-        print(f"Startup warning: {e}")
+        logger_error.error(f"Startup warning: {e}")

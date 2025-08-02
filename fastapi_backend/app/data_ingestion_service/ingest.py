@@ -8,6 +8,7 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
 from app.config import settings
+from app.utils import logger_info, logger_error
 
 # === Config ===
 DOCS_DIR = settings.DOCUMENT_LOADER_DIR
@@ -71,7 +72,7 @@ async def chunk_documents(docs):
 
 # === Step 3: Embed & Store in Qdrant ===
 async def ingest_to_qdrant(docs):
-    print(f"Processing {len(docs)} document chunks...")
+    logger_info.info(f"Processing {len(docs)} document chunks...")
     
     # Initialize embeddings with batch processing
     embeddings = OpenAIEmbeddings(
@@ -89,13 +90,13 @@ async def ingest_to_qdrant(docs):
     # Create collection if it doesn't exist
     try:
         client.get_collection(QDRANT_COLLECTION_NAME)
-        print(f"Collection '{QDRANT_COLLECTION_NAME}' already exists")
+        logger_info.info(f"Collection '{QDRANT_COLLECTION_NAME}' already exists")
     except Exception:
         client.create_collection(
             collection_name=QDRANT_COLLECTION_NAME,
             vectors_config=VectorParams(size=settings.VECTOR_DIMENSION, distance=Distance.COSINE),
         )
-        print(f"Created collection '{QDRANT_COLLECTION_NAME}'")
+        logger_info.info(f"Created collection '{QDRANT_COLLECTION_NAME}'")
     
     # Initialize vector store
     vector_store = QdrantVectorStore(
@@ -108,6 +109,6 @@ async def ingest_to_qdrant(docs):
     for i in range(0, len(docs), settings.INGESTION_BATCH_SIZE):
         batch = docs[i:i + settings.INGESTION_BATCH_SIZE]
         vector_store.add_documents(batch)
-        print(f"Processed batch {i//settings.INGESTION_BATCH_SIZE + 1}/{(len(docs) + settings.INGESTION_BATCH_SIZE - 1)//settings.INGESTION_BATCH_SIZE} ({len(batch)} chunks)")
+        logger_info.info(f"Processed batch {i//settings.INGESTION_BATCH_SIZE + 1}/{(len(docs) + settings.INGESTION_BATCH_SIZE - 1)//settings.INGESTION_BATCH_SIZE} ({len(batch)} chunks)")
     
-    print(f"✅ Ingested {len(docs)} chunks into Qdrant!")
+    print(f"Ingested {len(docs)} chunks into Qdrant!")
