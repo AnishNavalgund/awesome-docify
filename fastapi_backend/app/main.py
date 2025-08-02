@@ -4,7 +4,6 @@ from app.config import settings
 from app.routes import query
 from app.routes import debug
 from app.utils import simple_generate_unique_route_id
-from app.database import create_db_and_tables
 from app.data_ingestion_service import load_documents_from_dir, chunk_documents, ingest_to_qdrant
 from openai import OpenAI
 from pathlib import Path

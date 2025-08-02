@@ -1,4 +1,4 @@
-from app.schemas import Intent, DocumentUpdate, ContentChange
+from app.schemas import Intent, DocumentUpdate
 from app.ai_engine_service.intent import extract_intent, UnifiedIntentHandler, IntentHandlerFactory
 from app.ai_engine_service.prompts import UNIFIED_CONTENT_PROMPT
 from app.config import settings
@@ -6,15 +6,12 @@ from app.utils import logger_info, logger_error
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
-from langchain.prompts import ChatPromptTemplate
 from qdrant_client import QdrantClient
 from langchain_core.documents import Document
 
 from pathlib import Path
 from typing import List, Dict
 import warnings
-import json
-import re
 
 warnings.filterwarnings("ignore")
 

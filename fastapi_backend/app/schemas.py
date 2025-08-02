@@ -15,11 +15,11 @@ class DocumentUpdate(BaseModel):
     section: Optional[str] = Field(None, description="Specific section that needs changes")
     original_content: Optional[str] = Field(None, description="Original content from the document")
     new_content: Optional[str] = Field(None, description="Suggested new content")
-    line_numbers: Optional[List[int]] = Field(None, description="Line numbers where changes should be made")
 
 class QueryResponse(BaseModel):
     """Simple response showing which documents need updates"""
     query: str = Field(..., description="Original user query")
+    keyword: Optional[str] = Field(None, description="Target keyword extracted from query")
     analysis: str = Field(..., description="What the AI found and analyzed")
     documents_to_update: List[DocumentUpdate] = Field(..., description="List of documents that need changes")
     total_documents: int = Field(..., description="Total number of documents that need updates")
@@ -39,18 +39,6 @@ class SavedChange(BaseModel):
     approved_by: str
     timestamp: datetime
     status: str = "accepted"
-
-class GetSavedChangesResponse(BaseModel):
-    """Response for retrieving saved changes"""
-    saved_changes: List[SavedChange] = Field(..., description="List of saved changes")
-    total_count: int = Field(..., description="Total number of saved changes")
-
-class IngestRequest(BaseModel):
-    docs_dir: str = Field(..., description="Directory containing JSON files to ingest")
-
-class IngestResponse(BaseModel):
-    ingested_files: int = Field(..., description="Number of files ingested")
-    status: str = Field(..., description="Status of the ingestion process")
 
 class CollectionInfo(BaseModel):
     name: str = Field(..., description="Name of the vector database collection")

@@ -8,13 +8,9 @@ from app.schemas import (
     SaveChangeRequest,
     SaveChangeResponse,
     SavedChange,
-    GetSavedChangesResponse,
-    IngestRequest,
-    IngestResponse,
     CollectionInfo,
     DocumentUpdate,
 )
-from app.ai_engine_service.intent import extract_intent
 from app.ai_engine_service.rag_engine import orchestrator
 from app.utils import logger_info, logger_error
 from qdrant_client import QdrantClient
