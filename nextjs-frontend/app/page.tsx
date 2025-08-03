@@ -150,6 +150,46 @@ export default function Home() {
     }
   };
 
+  const handleApproveAll = () => {
+    const newDecisions: Record<string, 'approve' | 'reject' | 'modify'> = {};
+    visibleDocuments.forEach((doc, visibleIndex) => {
+      const originalIndex = response?.documents_to_update.findIndex(d => 
+        d.file === doc.file && 
+        d.action === doc.action && 
+        d.reason === doc.reason &&
+        d.original_content === doc.original_content &&
+        d.new_content === doc.new_content
+      );
+      if (originalIndex !== undefined && originalIndex !== -1) {
+        newDecisions[`doc-${originalIndex}`] = 'approve';
+      }
+    });
+    setReviewDecisions(prev => ({
+      ...prev,
+      ...newDecisions
+    }));
+  };
+
+  const handleRejectAll = () => {
+    const newDecisions: Record<string, 'approve' | 'reject' | 'modify'> = {};
+    visibleDocuments.forEach((doc, visibleIndex) => {
+      const originalIndex = response?.documents_to_update.findIndex(d => 
+        d.file === doc.file && 
+        d.action === doc.action && 
+        d.reason === doc.reason &&
+        d.original_content === doc.original_content &&
+        d.new_content === doc.new_content
+      );
+      if (originalIndex !== undefined && originalIndex !== -1) {
+        newDecisions[`doc-${originalIndex}`] = 'reject';
+      }
+    });
+    setReviewDecisions(prev => ({
+      ...prev,
+      ...newDecisions
+    }));
+  };
+
   const saveChanges = async () => {
     if (!response) return;
 
@@ -308,142 +348,168 @@ export default function Home() {
         {response && (
           <div className="space-y-8">
             {/* Documents to Update */}
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Documents to Update ({visibleDocuments.length})
-              </h2>
+            <Card className="border-2 border-gray-200 dark:border-gray-700">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">Documents to Update ({visibleDocuments.length})</CardTitle>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-green-600 hover:text-green-700"
+                      onClick={handleApproveAll}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Approve All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={handleRejectAll}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject All
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
               
-              {visibleDocuments.map((doc, visibleIndex) => {
-                // Find the original index in the full array to maintain correct decision mapping
-                const originalIndex = response.documents_to_update.findIndex(d => 
-                  d.file === doc.file && 
-                  d.action === doc.action && 
-                  d.reason === doc.reason &&
-                  d.original_content === doc.original_content &&
-                  d.new_content === doc.new_content
-                );
-                
-                // Create a unique identifier for this document
-                const docId = `doc-${originalIndex}`;
-                const isEditingThisDoc = isEditing[docId] || false;
-                const currentContent = editableContent[docId] || doc.new_content || '';
-                
-                return (
-                  <Card key={`${doc.file}-${visibleIndex}-${doc.action}`} className="border-2 border-gray-200 dark:border-gray-700">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg">{doc.file}</CardTitle>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant={reviewDecisions[docId] === 'approve' ? 'default' : 'outline'}
-                            onClick={() => handleReviewDecision(docId, 'approve')}
-                            className="text-green-600 hover:text-green-700"
-                            disabled={isEditingThisDoc}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={reviewDecisions[docId] === 'reject' ? 'default' : 'outline'}
-                            onClick={() => handleReviewDecision(docId, 'reject')}
-                            className="text-red-600 hover:text-red-700"
-                            disabled={isEditingThisDoc}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={reviewDecisions[docId] === 'modify' ? 'default' : 'outline'}
-                            onClick={() => handleReviewDecision(docId, 'modify')}
-                            className="text-blue-600 hover:text-blue-700"
-                            disabled={isEditingThisDoc}
-                          >
-                            <Edit3 className="h-4 w-4 mr-1" />
-                            Modify
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent>
-                      <div className="space-y-4">
-                        {/* Actual Diff View */}
-                        {doc.original_content && currentContent && (
-                          <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Proposed Changes</h4>
-                            {isEditingThisDoc ? (
-                              <div className="space-y-4">
-                                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Current Content
-                                  </div>
-                                  <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded text-sm font-mono">
-                                    {doc.original_content}
-                                  </div>
-                                </div>
-                                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Edit New Content
-                                  </div>
-                                  <Textarea
-                                    value={currentContent}
-                                    onChange={(e) => handleContentEdit(docId, e.target.value)}
-                                    className="min-h-[200px] font-mono text-sm"
-                                    placeholder="Edit the content here..."
-                                  />
-                                  <div className="flex justify-end space-x-2 mt-3">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleCancelEdit(docId)}
-                                    >
-                                      <X className="h-4 w-4 mr-1" />
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleSaveEdit(docId)}
-                                    >
-                                      <Save className="h-4 w-4 mr-1" />
-                                      Save
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <DiffViewer
-                                originalContent={doc.original_content}
-                                newContent={currentContent}
-                                fileTitle={doc.file}
-                                section={doc.section || "Content"}
-                                changeType={doc.action}
-                              />
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Fallback if no content available */}
-                        {(!doc.original_content || !currentContent) && (
-                          <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Document Update Required</h4>
-                            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                              <p className="text-yellow-800 dark:text-yellow-200">
-                                Content extraction is in progress. The document "{doc.file}" needs to be updated based on the query.
-                              </p>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {visibleDocuments.map((doc, visibleIndex) => {
+                      const originalIndex = response.documents_to_update.findIndex(d => 
+                        d.file === doc.file && 
+                        d.action === doc.action && 
+                        d.reason === doc.reason &&
+                        d.original_content === doc.original_content &&
+                        d.new_content === doc.new_content
+                      );
+                      const docId = `doc-${originalIndex}`;
+                      const isEditingThisDoc = isEditing[docId] || false;
+                      
+                      return (
+                        <div key={`${doc.file}-${visibleIndex}-${doc.action}`} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{doc.file}</h3>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{doc.action} - {doc.reason}</p>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                          <div className="flex space-x-1">
+                            <Button
+                              size="sm"
+                              variant={reviewDecisions[docId] === 'approve' ? 'default' : 'outline'}
+                              onClick={() => handleReviewDecision(docId, 'approve')}
+                              className="text-green-600 hover:text-green-700 text-xs px-2 py-1"
+                              disabled={isEditingThisDoc}
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={reviewDecisions[docId] === 'reject' ? 'default' : 'outline'}
+                              onClick={() => handleReviewDecision(docId, 'reject')}
+                              className="text-red-600 hover:text-red-700 text-xs px-2 py-1"
+                              disabled={isEditingThisDoc}
+                            >
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Reject
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={reviewDecisions[docId] === 'modify' ? 'default' : 'outline'}
+                              onClick={() => handleReviewDecision(docId, 'modify')}
+                              className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1"
+                              disabled={isEditingThisDoc}
+                            >
+                              <Edit3 className="h-3 w-3 mr-1" />
+                              Modify
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Show diff for the first document with content */}
+                  {(() => {
+                    const firstDocWithContent = visibleDocuments.find(doc => doc.original_content && doc.new_content);
+                    if (firstDocWithContent) {
+                      const originalIndex = response.documents_to_update.findIndex(d => 
+                        d.file === firstDocWithContent.file && 
+                        d.action === firstDocWithContent.action && 
+                        d.reason === firstDocWithContent.reason &&
+                        d.original_content === firstDocWithContent.original_content &&
+                        d.new_content === firstDocWithContent.new_content
+                      );
+                      const docId = `doc-${originalIndex}`;
+                      const isEditingThisDoc = isEditing[docId] || false;
+                      const currentContent = editableContent[docId] || firstDocWithContent.new_content || '';
+                      
+                      return (
+                        <div>
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Proposed Changes</h4>
+                          {isEditingThisDoc ? (
+                            <div className="space-y-4">
+                              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Current Content
+                                </div>
+                                <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded text-sm font-mono">
+                                  {firstDocWithContent.original_content}
+                                </div>
+                              </div>
+                              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Edit New Content
+                                </div>
+                                <Textarea
+                                  value={currentContent}
+                                  onChange={(e) => handleContentEdit(docId, e.target.value)}
+                                  className="min-h-[200px] font-mono text-sm"
+                                  placeholder="Edit the content here..."
+                                />
+                                <div className="flex justify-end space-x-2 mt-3">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleCancelEdit(docId)}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSaveEdit(docId)}
+                                  >
+                                    <Save className="h-4 w-4 mr-1" />
+                                    Save
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <DiffViewer
+                              originalContent={firstDocWithContent.original_content}
+                              newContent={currentContent}
+                              fileTitle={firstDocWithContent.file}
+                              section={firstDocWithContent.section || "Content"}
+                              changeType={firstDocWithContent.action}
+                            />
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-4">

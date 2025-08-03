@@ -15,6 +15,11 @@ from app.ai_engine_service.rag_engine import orchestrator
 from app.utils import logger_info, logger_error
 from qdrant_client import QdrantClient
 from app.config import settings
+from app.database import save_document_version_and_update
+from app.models import Document
+from app.database import AsyncSessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 router = APIRouter(prefix="/api/v1", tags=["Docify"])
 
@@ -52,35 +57,44 @@ async def query_docs(request: QueryRequest):
 
 @router.post("/save-change", response_model=SaveChangeResponse)
 async def save_change(request: SaveChangeRequest):
+
+    print(f">>>>> Saving changes")
     """
-    Save the user-approved changes to in-memory storage
+    Save the user-approved changes to the database (with versioning)
     """
     try:
         saved_count = 0
-        
-        for doc_update in request.document_updates:
-            # Create unique key for each saved change
-            key = f"{doc_update.file}_{datetime.now().timestamp()}_{saved_count}"
-            
-            # Create SavedChange object
-            saved_change = SavedChange(
-                document_update=doc_update,
-                approved_by=request.approved_by,
-                timestamp=request.timestamp,
-                status="accepted"
-            )
-            
-            # Store in memory
-            saved_changes[key] = saved_change
-            logger_info.info(f"Saved change for {doc_update.file}")
-            saved_count += 1
-            
-        
+        async with AsyncSessionLocal() as session:
+            for doc_update in request.document_updates:
+                # Look up document by file_name instead of ID
+                result = await session.execute(
+                    select(Document).where(Document.file_name == doc_update.file)
+                )
+                doc = result.scalar_one_or_none()
+                if not doc:
+                    continue  
+
+                # Update content if provided
+                if doc_update.new_content is not None:
+                    doc.content = doc_update.new_content
+
+                # Save version and update 
+                await save_document_version_and_update(
+                    session=session,
+                    document_id=doc.id,
+                    new_content=doc.content,  # use the possibly updated content
+                    updated_by=request.approved_by,
+                    notes=doc_update.reason
+                )
+                saved_count += 1
+
+        print(f">>>>> Saved in the database!!!")
+
         return SaveChangeResponse(
-            status="success", 
+            status="success",
             saved_count=saved_count
         )
-        
+
     except Exception as e:
         logger_error.error(f"Error saving changes: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save changes: {str(e)}")

@@ -4,6 +4,7 @@ from app.config import settings
 from app.routes import query
 from app.routes import debug
 from app.utils import simple_generate_unique_route_id
+from app.database import create_db_and_tables, is_db_empty, populate_db
 from app.data_ingestion_service import load_documents_from_dir, chunk_documents, ingest_to_qdrant
 from openai import OpenAI
 from pathlib import Path
@@ -41,8 +42,19 @@ app.include_router(debug.router)
 # Startup logic
 @app.on_event("startup")
 async def startup_event():
-    # Skip database initialization since no models are defined
-    # await create_db_and_tables()
+    # Create database tables
+    await create_db_and_tables()
+    
+    # Check if PostgreSQL documents table is empty and populate if needed
+    try:
+        if await is_db_empty():
+            print("PostgreSQL documents table is empty, populating with initial data...")
+            await populate_db()
+            print("PostgreSQL documents table populated successfully")
+        else:
+            print("PostgreSQL documents table already contains data, skipping population")
+    except Exception as e:
+        logger_error.error(f"PostgreSQL population error: {e}")
     
     try:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
