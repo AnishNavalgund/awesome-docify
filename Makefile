@@ -40,7 +40,7 @@ start-local-application: ## Start frontend and backend concurrently
 # Docker commands
 .PHONY: docker-backend-shell docker-frontend-shell docker-build docker-build-backend \
         docker-build-frontend docker-start-backend docker-start-frontend docker-up-test-db \
-        docker-migrate-db docker-db-schema docker-test-backend docker-test-frontend
+        docker-test-backend docker-test-frontend
 
 
 docker-backend-shell: ## Access the backend container shell
@@ -66,12 +66,6 @@ docker-start-frontend: ## Start the frontend container
 
 docker-up-test-db: ## Start the test database container
 	$(DOCKER_COMPOSE) up db_test
-
-docker-migrate-db: ## Run database migrations using Alembic
-	$(DOCKER_COMPOSE) run --rm backend alembic upgrade head
-
-docker-db-schema: ## Generate a new migration schema. Usage: make docker-db-schema migration_name="add users"
-	$(DOCKER_COMPOSE) run --rm backend alembic revision --autogenerate -m "$(migration_name)"
 
 docker-test-backend: ## Run tests for the backend
 	$(DOCKER_COMPOSE) run --rm backend pytest

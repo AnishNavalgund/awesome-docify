@@ -91,15 +91,7 @@ To update the hooks to their latest versions, run:
 ```bash
 pre-commit autoupdate
 ```
-### Alembic Database Migrations
-If you need to create a new Database Migration:
-   ```bash
-   make docker-db-schema migration_name="add users"
-   ```
-then apply the migration to the database:
-   ```bash
-   make docker-migrate-db
-   ```
+
 
 ### GitHub Actions
 This project has a pre-configured GitHub Actions setup to enable CI/CD. The workflow configuration files are inside the .github/workflows directory. You can customize these workflows to suit your project's needs better.
