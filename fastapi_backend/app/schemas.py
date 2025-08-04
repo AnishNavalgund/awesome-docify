@@ -15,31 +15,30 @@ class DocumentUpdate(BaseModel):
     section: Optional[str] = Field(None, description="Specific section that needs changes")
     original_content: Optional[str] = Field(None, description="Original content from the document")
     new_content: Optional[str] = Field(None, description="Suggested new content")
-    line_numbers: Optional[List[int]] = Field(None, description="Line numbers where changes should be made")
 
 class QueryResponse(BaseModel):
     """Simple response showing which documents need updates"""
     query: str = Field(..., description="Original user query")
+    keyword: Optional[str] = Field(None, description="Target keyword extracted from query")
     analysis: str = Field(..., description="What the AI found and analyzed")
     documents_to_update: List[DocumentUpdate] = Field(..., description="List of documents that need changes")
     total_documents: int = Field(..., description="Total number of documents that need updates")
 
 class SaveChangeRequest(BaseModel):
-    original_code: str = Field(..., description="Original code to be modified")
-    updated_code: str = Field(..., description="Updated code after modification")
-    diff: str = Field(..., description="Diff between original and updated code")
+    document_updates: List[DocumentUpdate] = Field(..., description="List of document updates to save")
     approved_by: str = Field(..., description="Name of the person who approved the change")
-    timestamp: datetime = Field(..., description="Timestamp of the change")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp of the change")
 
 class SaveChangeResponse(BaseModel):
     status: str = Field(..., description="Status of the change")
+    saved_count: int = Field(..., description="Number of changes saved")
 
-class IngestRequest(BaseModel):
-    docs_dir: str = Field(..., description="Directory containing JSON files to ingest")
-
-class IngestResponse(BaseModel):
-    ingested_files: int = Field(..., description="Number of files ingested")
-    status: str = Field(..., description="Status of the ingestion process")
+class SavedChange(BaseModel):
+    """Represents a saved change in memory"""
+    document_update: DocumentUpdate
+    approved_by: str
+    timestamp: datetime
+    status: str = "accepted"
 
 class CollectionInfo(BaseModel):
     name: str = Field(..., description="Name of the vector database collection")

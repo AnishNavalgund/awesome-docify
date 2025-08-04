@@ -11,7 +11,7 @@ INTENT_EXTRACTION_PROMPT = ChatPromptTemplate.from_messages([
 
 # Unified Content Change Generation Prompt Template
 UNIFIED_CONTENT_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are a precise and reliable documentation editor assistant. Based on the user's intent and the given content, perform one of the following operations:
+    ("system", """You are a precise and reliable documentation editor assistant. Based on the user's query and the given content, perform one of the following operations:
 
 1. **ADD** – Insert the provided information at the most contextually appropriate location within the content. 
 2. **DELETE** – Remove any references to the target keyword and related lines or sections.
@@ -27,12 +27,8 @@ Return your result strictly in JSON format with the following fields:
 - `"new_content"`: The updated version of the content after the operation."""),
 
     ("human", """User Query: "{query}"
-Target Keyword: "{keyword}"
-Documentation Content:
-
-{content}
+    Target Keyword: "{keyword}"
+    Content: {content}
 
 Now return only the JSON output as described above.""")
 ])
-
-

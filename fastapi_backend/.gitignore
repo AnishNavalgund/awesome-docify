@@ -21,6 +21,7 @@ wheels/
 *.egg
 MANIFEST
 testScripts/
+chunk_ids.txt
 
 # Virtual environments
 .env

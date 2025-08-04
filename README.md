@@ -10,7 +10,6 @@ Your AI assistant for painless documentation updates.
 - [**Tailwind CSS**](https://tailwindcss.com/) - Utility-first CSS framework
 - [**shadcn/ui**](https://ui.shadcn.com/) - Beautiful React components
 - [**Docker**](https://www.docker.com/) - Containerized development environment
-- [**CI/CD**](https://github.com/features/actions) - GitHub Actions workflows for testing
 
 ## Prerequisites
 
@@ -18,7 +17,6 @@ Before getting started, ensure you have the following tools installed:
 
 - **UV** - Fast Python package manager
 - **PNPM** - Fast Next.js & React package manager  
-- **Pre-commit** - Git hooks for code quality
 - **Make** - Build automation tool
 - **Docker** - Containerization platform
 - **Docker Compose** - Multi-container orchestration
@@ -30,7 +28,7 @@ Before getting started, ensure you have the following tools installed:
 Run this command to verify all prerequisites are installed:
 
 ```bash
-echo "UV: $(uv --version)" && echo "PNPM: $(pnpm --version)" && echo "Make: $(make --version)" && echo "Docker: $(docker --version)" && echo "Docker Compose: $(docker compose version)" && echo "Pre-commit: $(pre-commit --version)"
+echo "UV: $(uv --version)" && echo "PNPM: $(pnpm --version)" && echo "Make: $(make --version)" && echo "Docker: $(docker --version)" && echo "Docker Compose: $(docker compose version)"
 ```
 
 ## Getting Started
@@ -57,20 +55,7 @@ cd ../nextjs-frontend
 pnpm install
 ```
 
-### 3. Pre-commit Setup
-
-```bash
-# Install pre-commit
-pip install pre-commit
-
-# Install the git hooks
-pre-commit install
-
-# Run against all files (optional)
-pre-commit run --all-files
-```
-
-### 4. Start the application
+### 3. Start the application
 **Option A: Using Docker**
 ```bash
 docker compose up -d

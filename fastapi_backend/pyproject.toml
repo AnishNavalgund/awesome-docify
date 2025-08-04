@@ -9,7 +9,6 @@ dependencies = [
     "fastapi[standard]>=0.115.0,<0.116",
     "pydantic-settings>=2.5.2,<3",
     "sqlalchemy>=2.0.0,<3.0.0",
-    "alembic>=1.14.0,<2.0.0",
     "asyncpg>=0.29.0,<1.0.0",
     "psycopg2-binary>=2.9.0,<3.0.0",
     "watchdog>=5.0.0,<6.0.0",
@@ -20,6 +19,7 @@ dependencies = [
     "langchain>=0.2.0",
     "langchain-openai>=0.1.0",
     "langchain-community>=0.2.0",
+    "langchain-qdrant>=0.2.0",
 ]
 
 [dependency-groups]

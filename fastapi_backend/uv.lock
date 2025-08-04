@@ -59,20 +59,6 @@ wheels = [
 ]
 
 [[package]]
-name = "alembic"
-version = "1.16.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mako" },
-    { name = "sqlalchemy" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/83/52/72e791b75c6b1efa803e491f7cbab78e963695e76d4ada05385252927e76/alembic-1.16.4.tar.gz", hash = "sha256:efab6ada0dd0fae2c92060800e0bf5c1dc26af15a10e02fb4babff164b4725e2", size = 1968161 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c2/62/96b5217b742805236614f05904541000f55422a6060a90d7fd4ce26c172d/alembic-1.16.4-py3-none-any.whl", hash = "sha256:b05e51e8e82efc1abd14ba2af6392897e145930c3e0a2faf2b0da2f7f7fd660d", size = 247026 },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -125,12 +111,12 @@ name = "awesome-docify"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi", extra = ["standard"] },
     { name = "langchain" },
     { name = "langchain-community" },
     { name = "langchain-openai" },
+    { name = "langchain-qdrant" },
     { name = "openai" },
     { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
@@ -157,12 +143,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = ">=1.14.0,<2.0.0" },
     { name = "asyncpg", specifier = ">=0.29.0,<1.0.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.0,<0.116" },
     { name = "langchain", specifier = ">=0.2.0" },
     { name = "langchain-community", specifier = ">=0.2.0" },
     { name = "langchain-openai", specifier = ">=0.1.0" },
+    { name = "langchain-qdrant", specifier = ">=0.2.0" },
     { name = "openai", specifier = ">=1.98.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.0,<3.0.0" },
     { name = "pydantic-settings", specifier = ">=2.5.2,<3" },
@@ -809,6 +795,20 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-qdrant"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "pydantic" },
+    { name = "qdrant-client" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f2/8c/f006636b4cc2d95ba072a57df3f2f99d8cf7cb47a79cc447a7e3e391f7ee/langchain_qdrant-0.2.0.tar.gz", hash = "sha256:41b8573cbb1b4706f76dc769251d8e6b3e4107ecd5fa97c58141977ec19fba75", size = 21429 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/01/22dad84373ba282237a3351547443c9c94c39fe75f71a1759f97cfa89725/langchain_qdrant-0.2.0-py3-none-any.whl", hash = "sha256:8eab5b8a553204ddb809d8183a6f1bc12fc265688592d9d897388f6939c79bf8", size = 23406 },
+]
+
+[[package]]
 name = "langchain-text-splitters"
 version = "0.3.9"
 source = { registry = "https://pypi.org/simple" }
@@ -836,18 +836,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/46/38/0da897697ce29fb78cdaacae2d0fa3a4bc2a0abf23f84f6ecd1947f79245/langsmith-0.4.8.tar.gz", hash = "sha256:50eccb744473dd6bd3e0fe024786e2196b1f8598f8defffce7ac31113d6c140f", size = 352414 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/19/4f/481324462c44ce21443b833ad73ee51117031d41c16fec06cddbb7495b26/langsmith-0.4.8-py3-none-any.whl", hash = "sha256:ca2f6024ab9d2cd4d091b2e5b58a5d2cb0c354a0c84fe214145a89ad450abae0", size = 367975 },
-]
-
-[[package]]
-name = "mako"
-version = "1.3.10"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markupsafe" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/38/bd5b78a920a64d708fe6bc8e0a2c075e1389d53bef8413725c63ba041535/mako-1.3.10.tar.gz", hash = "sha256:99579a6f39583fa7e5630a28c3c1f440e4e97a414b80372649c0ce338da2ea28", size = 392474 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/fb/99f81ac72ae23375f22b7afdb7642aba97c00a713c217124420147681a2f/mako-1.3.10-py3-none-any.whl", hash = "sha256:baef24a52fc4fc514a0887ac600f9f1cff3d82c61d4d700a1fa84d597b88db59", size = 78509 },
 ]
 
 [[package]]
