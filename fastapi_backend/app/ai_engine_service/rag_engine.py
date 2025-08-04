@@ -10,7 +10,7 @@ from qdrant_client import QdrantClient
 from langchain_core.documents import Document
 
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -56,14 +56,34 @@ class DocuRAG:
             intent = await extract_intent(query)
             print(f">>>> Intent: {intent}")
 
-            # Step 2: Retrieve relevant documents
-            print("Step 2: Retrieving documents...")
-            vector_store = self._get_vector_store()
-            retriever = vector_store.as_retriever(
-                search_type="mmr",
-                search_kwargs={"k": settings.TOP_K_DOCS, "fetch_k": 2 * settings.TOP_K_DOCS, "lambda_mult": 0.5}
+            # Step 2: Retrieve relevant documents with similarity filtering
+            print("Step 2: Retrieving documents with similarity filtering...")
+            
+            # Get documents with similarity scores
+            client = self._get_client()
+            query_embedding = self.embeddings.embed_query(query)
+            
+            search_results = client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=settings.TOP_K_DOCS * 2,
+                with_payload=True
             )
-            source_documents: List[Document] = await retriever.ainvoke(query)
+            
+            # Filter by similarity score
+            source_documents = []
+            for result in search_results:
+                if result.score >= settings.MIN_SIMILARITY_SCORE:
+                    doc = Document(
+                        page_content=result.payload.get("page_content", ""),
+                        metadata=result.payload.get("metadata", {})
+                    )
+                    source_documents.append(doc)
+                    print(f"Document included (score: {result.score:.3f})")
+                else:
+                    print(f"Document excluded (score: {result.score:.3f} < {settings.MIN_SIMILARITY_SCORE})")
+            
+            print(f"Retrieved {len(source_documents)} documents after similarity filtering")
             
             print("Step 3: Processing intent with handler...")
             handler = IntentHandlerFactory.create_handler(intent, self.llm_model)
@@ -74,7 +94,7 @@ class DocuRAG:
             return {
                 "query": query,
                 "keyword": intent.target,
-                "analysis": f"Found {len(documents_to_update)} documents containing the keyword '{intent.target}'. Generated suggested changes for {intent.action} operation.",
+                "analysis": f"Retrieved {len(source_documents)} relevant documents (similarity ≥ {settings.MIN_SIMILARITY_SCORE}) containing '{intent.target}'. Generated suggested changes for {intent.action} operation.",
                 "documents_to_update": documents_to_update,
                 "total_documents": len(documents_to_update)
             }

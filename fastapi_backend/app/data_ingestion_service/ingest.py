@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from datetime import datetime
 from langchain.schema import Document
 from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
@@ -9,6 +8,8 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
 from app.config import settings
 from app.utils import logger_info, logger_error
+import uuid
+import datetime
 
 # === Config ===
 DOCS_DIR = settings.DOCUMENT_LOADER_DIR
@@ -25,12 +26,15 @@ async def load_documents_from_dir(directory: str):
 
             if metadata.get("language", "en") != "en" or not markdown.strip():
                 continue  # Skip non-English or empty docs
-
+            doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, str(file.resolve())))
             metadata.update({
-                "file_path": str(file),
-                "file_size": file.stat().st_size,
-                "last_modified": datetime.fromtimestamp(file.stat().st_mtime).isoformat(),
-                "title": metadata.get("title") or file.stem.replace("_", " ").title()
+            "file_path": str(file) if file else metadata.get("sourceURL", "unknown"),
+            "file_size": file.stat().st_size if file else metadata.get("fileSize", "unknown"),
+            "last_modified": datetime.datetime.fromtimestamp(file.stat().st_mtime) if file else None,
+            "title": metadata.get("title") or file.stem.replace("_", " ").title() if file else "Untitled",
+            "doc_id": doc_id,
+            "version": datetime.datetime.now().isoformat(),
+            "source_url": metadata.get("sourceURL", "unknown")
             })
 
             docs.append(Document(page_content=markdown, metadata=metadata))
@@ -42,7 +46,7 @@ async def load_documents_from_dir(directory: str):
 async def chunk_documents(docs):
     all_chunks = []
 
-    # Step 1: Setup
+    # Step 1: Setup splitters
     header_splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=[("#", "h1"), ("##", "h2"), ("###", "h3")]
     )
@@ -57,16 +61,24 @@ async def chunk_documents(docs):
         header_chunks = header_splitter.split_text(doc.page_content)
 
         for chunk in header_chunks:
-            # Attach original metadata
-            chunk.metadata.update(doc.metadata)
+            # Step 2a: Start with a copy of original doc metadata
+            base_metadata = doc.metadata.copy()
+            base_metadata.update(chunk.metadata)  # If header_splitter added section info
 
-            # Step 3: If too long, further split recursively
-            if len(chunk.page_content) > 2000:  # Can replace with token count if needed
-                sub_chunks = recursive_splitter.split_text(chunk.page_content)
-                for sub in sub_chunks:
-                    all_chunks.append(Document(page_content=sub, metadata=chunk.metadata.copy()))
+            content = chunk.page_content
+            if len(content) > 2000:  # Optional: replace with token count
+                sub_chunks = recursive_splitter.split_text(content)
+                for idx, sub in enumerate(sub_chunks):
+                    metadata = base_metadata.copy()
+                    metadata["chunk_id"] = str(uuid.uuid4())
+                    metadata["chunk_index"] = idx
+                    metadata["chunk_type"] = "recursive"
+                    all_chunks.append(Document(page_content=sub, metadata=metadata))
             else:
-                all_chunks.append(chunk)
+                base_metadata["chunk_id"] = str(uuid.uuid4())
+                base_metadata["chunk_index"] = 0
+                base_metadata["chunk_type"] = "header"
+                all_chunks.append(Document(page_content=content, metadata=base_metadata))
 
     return all_chunks
 

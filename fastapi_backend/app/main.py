@@ -4,13 +4,15 @@ from app.config import settings
 from app.routes import query
 from app.routes import debug
 from app.utils import simple_generate_unique_route_id
-from app.database import create_db_and_tables, is_db_empty, populate_db
+from app.database import create_db_and_tables, is_db_empty, save_chunks_to_postgres, clear_existing_data
 from app.data_ingestion_service import load_documents_from_dir, chunk_documents, ingest_to_qdrant
 from openai import OpenAI
 from pathlib import Path
 from app.utils import logger_info, logger_error
 from qdrant_client import QdrantClient
-
+from app.database import AsyncSessionLocal
+from app.models import Document
+import datetime
 app = FastAPI(
     title="awesome-docify",
     description="Awesome Docify API",
@@ -44,17 +46,49 @@ app.include_router(debug.router)
 async def startup_event():
     # Create database tables
     await create_db_and_tables()
-    
-    # Check if PostgreSQL documents table is empty and populate if needed
-    try:
-        if await is_db_empty():
-            print("PostgreSQL documents table is empty, populating with initial data...")
-            await populate_db()
-            print("PostgreSQL documents table populated successfully")
-        else:
-            print("PostgreSQL documents table already contains data, skipping population")
-    except Exception as e:
-        logger_error.error(f"PostgreSQL population error: {e}")
+
+    await clear_existing_data()
+
+    print("Tables truncated. Ingesting fresh data...")
+
+    if await is_db_empty():
+        print("PostgreSQL documents table is empty, populating with the data...")
+        try:
+            docs = await load_documents_from_dir(settings.DOCUMENT_LOADER_DIR)
+            if docs:
+                async with AsyncSessionLocal() as session:
+                    # Insert documents into DB first
+                    for doc in docs:
+                        meta = doc.metadata
+                        document = Document(
+                            doc_id=meta["doc_id"], 
+                            file_name=Path(meta.get("file_path", "unknown")).name,
+                            title=meta.get("title", "Untitled"),
+                            file_path=meta.get("file_path", "unknown"),
+                            file_size=meta.get("file_size", 0),
+                            language=meta.get("language", "en"),
+                            version=meta.get("version", datetime.datetime.now().isoformat()),
+                            last_modified=meta.get("last_modified", datetime.datetime.now().isoformat()),
+                            source_url=meta.get("source_url", "unknown"),
+                            content_type=meta.get("content_type"),
+                            status_code=meta.get("status_code"),
+                            scrape_id=meta.get("scrape_id"),
+                            content=doc.page_content
+                            )
+                        session.add(document)
+                    await session.commit()
+
+                    # chunk and save to document_chunks
+                    chunked_docs = await chunk_documents(docs)
+                    await save_chunks_to_postgres(chunked_docs, session)
+
+                print("Documents and chunks ingested into PostgreSQL")
+            else:
+                print("No documents found to ingest")
+        except Exception as e:
+            logger_error.error(f"PostgreSQL ingestion failed: {e}")
+    else:
+        print("PostgreSQL documents table already contains data, skipping population")
     
     try:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -77,16 +111,15 @@ async def startup_event():
                 qdrant_client.close()
         
         if has_documents:
-            print("Documents already ingested, skipping ingestion!")
+            print("Embeddings already ingested to Qdrant, skipping ingestion!")
         else:
             print("No documents found in collection, starting ingestion...")
             # Load and ingest documents using the ingest functions
             docs = await load_documents_from_dir(settings.DOCUMENT_LOADER_DIR)
             print(f"Loaded {len(docs)} documents in english language only")
             if docs:
-                chunked_docs = await chunk_documents(docs)
                 await ingest_to_qdrant(chunked_docs)
-                print("Document ingestion completed")
+                print("Embeddings ingestion to Qdrant completed")
             else:
                 print("No documents found to ingest")
             

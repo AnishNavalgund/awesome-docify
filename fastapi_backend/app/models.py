@@ -1,39 +1,89 @@
-
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
+import uuid
+import datetime
+from sqlalchemy import (
+    Column, String, Text, Integer, ForeignKey, DateTime, Enum
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import declarative_base, relationship
+import enum
 
 Base = declarative_base()
 
+# ───────────────────────────────
+# Enums
+# ───────────────────────────────
+
+class ChunkType(str, enum.Enum):
+    header = "header"
+    recursive = "recursive"
+
+# ───────────────────────────────
+# Document Table
+# ───────────────────────────────
+
 class Document(Base):
-    """Model for storing document information"""
     __tablename__ = "documents"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    file_name = Column(String(255), nullable=False, index=True)
-    title = Column(String(500), nullable=True)
+
+    doc_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(Text, nullable=True)
+    file_path = Column(Text, nullable=True)
+    file_size = Column(Integer)
     language = Column(String(10), default="en")
-    source_url = Column(String(1000), nullable=True)
-    content_type = Column(String(100), nullable=True)
-    status_code = Column(Integer, nullable=True)
-    scrape_id = Column(String(100), nullable=True)
-    content = Column(Text, nullable=True)  # Store the markdown content
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    version = Column(String)
+    last_modified = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow())
+    content = Column(Text)
+
+    # For scraped metadata (optional)
+    file_name = Column(String)
+    source_url = Column(String)
+    content_type = Column(String)
+    status_code = Column(Integer)
+    scrape_id = Column(String)
+    updated_at = Column(DateTime)
+
+    # Relationships
+    versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan")
+    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+
+# ───────────────────────────────
+# Document Versions Table
+# ───────────────────────────────
 
 class DocumentVersion(Base):
-         """Model for storing document versions"""
-         __tablename__ = "document_versions"
-         id = Column(Integer, primary_key=True, index=True)
-         document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
-         file_name = Column(String(255), nullable=True)
-         title = Column(String(500), nullable=True)
-         language = Column(String(10), nullable=True)
-         source_url = Column(String(1000), nullable=True)
-         content_type = Column(String(100), nullable=True)
-         status_code = Column(Integer, nullable=True)
-         scrape_id = Column(String(100), nullable=True)
-         content = Column(Text, nullable=False)
-         updated_by = Column(String(255), nullable=True)
-         updated_at = Column(DateTime, default=datetime.utcnow)
-         notes = Column(Text, nullable=True)
+    __tablename__ = "document_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="CASCADE"))
+
+    # Snapshot of document fields
+    title = Column(Text)
+    file_name = Column(String)
+    language = Column(String(10))
+    source_url = Column(String)
+    content_type = Column(String)
+    status_code = Column(Integer)
+    scrape_id = Column(String)
+    content = Column(Text)
+    updated_by = Column(String)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow())
+    notes = Column(Text)
+
+    document = relationship("Document", back_populates="versions")
+
+# ───────────────────────────────
+# Chunk Table
+# ───────────────────────────────
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    chunk_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    doc_id = Column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="CASCADE"))
+
+    chunk_index = Column(Integer)
+    chunk_type = Column(Enum(ChunkType))
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow())
+
+    document = relationship("Document", back_populates="chunks")

@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 1024
     
     # RAG settings
-    TOP_K_DOCS: int = 5          # Reduced for precision
+    TOP_K_DOCS: int = 10         # Increased for similarity filtering
     MIN_CHARS_PER_CHUNK: int = 100
+    
+    # Similarity score threshold
+    MIN_SIMILARITY_SCORE: float = 0.3    # Minimum similarity score to include document
     
     # Qdrant settings
     QDRANT_PATH: str = "../local-shared-data/qdrant"
