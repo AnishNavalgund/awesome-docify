@@ -69,6 +69,6 @@ docker-up-test-db: ## Start the test database container
 
 docker-test-backend: ## Run tests for the backend
 	$(DOCKER_COMPOSE) run --rm backend pytest
-
+L
 docker-test-frontend: ## Run tests for the frontend
 	$(DOCKER_COMPOSE) run --rm frontend pnpm run test

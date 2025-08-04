@@ -81,7 +81,7 @@ async def save_change(request: SaveChangeRequest):
                 # Save version and update 
                 await save_document_version_and_update(
                     session=session,
-                    document_id=doc.id,
+                    document_id=doc.doc_id,
                     new_content=doc.content,  # use the possibly updated content
                     updated_by=request.approved_by,
                     notes=doc_update.reason

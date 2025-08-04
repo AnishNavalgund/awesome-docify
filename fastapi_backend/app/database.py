@@ -91,7 +91,7 @@ async def is_db_empty():
 
 async def save_document_version_and_update(
     session: AsyncSession,
-    document_id: int,
+    document_id: UUID,
     new_content: str,
     updated_by: str = None,
     notes: str = None
@@ -113,7 +113,7 @@ async def save_document_version_and_update(
         scrape_id=doc.scrape_id,
         content=doc.content,
         updated_by=updated_by,
-        updated_at=datetime.utcnow(),
+        updated_at=datetime.datetime.utcnow(),
         notes=notes,
     )
     session.add(version)
