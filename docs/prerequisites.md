@@ -4,7 +4,7 @@ This document outlines all the required tools and software needed to develop and
 ## Required Tools
 
 - **UV** - Fast Python package manager
-- **PNPM** - Fast Next.js & React package manager  
+- **PNPM** - Fast Next.js & React package manager
 - **Make** - Build automation tool
 - **Docker** - Containerization platform
 - **Docker Compose** - Multi-container orchestration
@@ -20,5 +20,3 @@ Depending on the operating system, choose the installation guide from the follow
 - [Docker Installation](https://docs.docker.com/get-docker/)
 - [Docker Compose Installation](https://docs.docker.com/compose/install/)
 - [Pre-commit Installation](https://pre-commit.com/#install)
-
-

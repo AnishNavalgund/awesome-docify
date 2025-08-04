@@ -14,16 +14,13 @@ interface DiffViewerProps {
 export function DiffViewer({
   originalContent,
   newContent,
-  fileTitle,
-  section,
-  changeType,
-  confidence
+  changeType
 }: DiffViewerProps) {
   // Enhanced diff algorithm to highlight word-level changes
   const generateDiff = (original: string, newText: string) => {
     const originalLines = original.split('\n');
     const newLines = newText.split('\n');
-    
+
     const diff: Array<{
       type: 'unchanged' | 'added' | 'removed' | 'modified';
       originalLine?: string;
@@ -33,11 +30,11 @@ export function DiffViewer({
     }> = [];
 
     const maxLines = Math.max(originalLines.length, newLines.length);
-    
+
     for (let i = 0; i < maxLines; i++) {
       const originalLine = originalLines[i];
       const newLine = newLines[i];
-      
+
       if (originalLine === newLine) {
         diff.push({
           type: 'unchanged',
@@ -58,7 +55,7 @@ export function DiffViewer({
         // For modified lines, highlight the differences
         const highlightedOriginal = highlightDifferences(originalLine, newLine, 'removed');
         const highlightedNew = highlightDifferences(newLine, originalLine, 'added');
-        
+
         diff.push({
           type: 'modified',
           originalLine,
@@ -68,7 +65,7 @@ export function DiffViewer({
         });
       }
     }
-    
+
     return diff;
   };
 
@@ -76,7 +73,7 @@ export function DiffViewer({
   const highlightDifferences = (text: string | undefined, compareText: string | undefined, type: 'added' | 'removed') => {
     const words = text ? text.split(/(\s+)/) : [];
     const compareWords = compareText ? compareText.split(/(\s+)/) : [];
-    
+
     return words.map((word, index) => {
       const compareWord = compareWords[index];
       if (word !== compareWord) {
@@ -125,7 +122,7 @@ export function DiffViewer({
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-0">
             {/* Current Content (Red) */}
             <div className="bg-red-50 dark:bg-red-900/10 p-4">
@@ -141,10 +138,10 @@ export function DiffViewer({
                     >
                       <div className="flex items-center space-x-2">
                         {getDiffIcon(line.type)}
-                        <span 
+                        <span
                           className="break-all"
-                          dangerouslySetInnerHTML={{ 
-                            __html: line.highlightedOriginal || line.originalLine || '' 
+                          dangerouslySetInnerHTML={{
+                            __html: line.highlightedOriginal || line.originalLine || ''
                           }}
                         />
                       </div>
@@ -157,7 +154,7 @@ export function DiffViewer({
                 </div>
               )}
             </div>
-            
+
             {/* New Content (Green) */}
             <div className="bg-green-50 dark:bg-green-900/10 p-4">
               <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
@@ -176,10 +173,10 @@ export function DiffViewer({
                     >
                       <div className="flex items-center space-x-2">
                         {getDiffIcon(line.type)}
-                        <span 
+                        <span
                           className="break-all"
-                          dangerouslySetInnerHTML={{ 
-                            __html: line.highlightedNew || line.newLine || '' 
+                          dangerouslySetInnerHTML={{
+                            __html: line.highlightedNew || line.newLine || ''
                           }}
                         />
                       </div>
@@ -193,4 +190,4 @@ export function DiffViewer({
       </CardContent>
     </Card>
   );
-} 
+}

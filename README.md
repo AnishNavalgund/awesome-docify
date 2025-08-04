@@ -16,7 +16,7 @@ Your AI assistant for painless documentation updates.
 Before getting started, ensure you have the following tools installed:
 
 - **UV** - Fast Python package manager
-- **PNPM** - Fast Next.js & React package manager  
+- **PNPM** - Fast Next.js & React package manager
 - **Make** - Build automation tool
 - **Docker** - Containerization platform
 - **Docker Compose** - Multi-container orchestration
@@ -50,7 +50,7 @@ make install
 cd fastapi_backend
 uv sync
 
-# Frontend dependencies  
+# Frontend dependencies
 cd ../nextjs-frontend
 pnpm install
 ```
@@ -81,9 +81,62 @@ docker compose up db -d
 ### 4. Access the application
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs  
+- **API Documentation**: http://localhost:8000/docs
 - **Postgres Database**: http://localhost:5432
 - **Qdrant Database**: http://localhost:6333
+
+## Code Quality with Pre-commit
+
+This project uses pre-commit hooks to ensure code quality and consistency.
+
+### Setup Pre-commit
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install the git hooks
+pre-commit install
+
+# Run on all files (first time)
+pre-commit run --all-files
+```
+
+### What Pre-commit Does
+
+**🔍 Basic Checks:**
+- Removes trailing whitespace
+- Ensures files end with newline
+- Validates YAML/JSON files
+- Catches merge conflicts
+
+**🐍 Python (Backend):**
+- **Black** - Code formatting
+- **isort** - Import organization
+- **Ruff** - Linting and formatting
+
+**⚛️ Frontend (Next.js):**
+- TypeScript type checking
+- ESLint code quality checks
+
+### Usage
+
+Pre-commit runs automatically on every commit. If any checks fail:
+1. Fix the issues
+2. Stage the fixed files
+3. Commit again
+
+**Manual run:**
+```bash
+# Run on staged files
+pre-commit run
+
+# Run on all files
+pre-commit run --all-files
+
+# Run specific hook
+pre-commit run black
+```
 
 ## Project Structure
 

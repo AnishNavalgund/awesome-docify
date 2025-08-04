@@ -1,13 +1,15 @@
-from fastapi import APIRouter, HTTPException
-from pathlib import Path
 import json
-from app.schemas import JSONFileListResponse, JSONFileContentResponse, CollectionInfo
-from qdrant_client import QdrantClient
+from pathlib import Path
+
 from app.config import settings
+from app.schemas import CollectionInfo, JSONFileContentResponse, JSONFileListResponse
+from fastapi import APIRouter, HTTPException
+from qdrant_client import QdrantClient
 
 router = APIRouter(prefix="/api/v1/debug", tags=["Debug"])
 
 DOCS_DIR = Path("../local-shared-data/docs")  # docs path
+
 
 @router.get("/json-files", response_model=JSONFileListResponse)
 async def list_json_files():
@@ -38,15 +40,12 @@ async def read_json_file(filename: str):
         with open(file_path, "r", encoding="utf-8") as f:
             content = json.load(f)
         print(f">>>>> Content keys: {list(content.keys())}")
-        
+
         # Extract markdown and metadata from the content
         markdown = content.get("markdown", "")
         metadata = content.get("metadata", {})
-        
-        return {
-            "markdown": markdown,
-            "metadata": metadata
-        }
+
+        return {"markdown": markdown, "metadata": metadata}
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"Invalid JSON format: {e}")
     except Exception as e:
@@ -59,29 +58,29 @@ async def check_qdrant_status():
     Check local Qdrant database status and collection info
     """
     try:
-        
         # Initialize Qdrant client
         qdrant_path = Path(settings.QDRANT_PATH)
-        
+
         if not qdrant_path.exists():
             raise HTTPException(status_code=404, detail="Qdrant directory not found")
-        
+
         client = QdrantClient(path=str(qdrant_path))
-        
+
         # Get collection info
         collection_info = client.get_collection(settings.QDRANT_COLLECTION_NAME)
-        
+
         info = {
             "name": settings.QDRANT_COLLECTION_NAME,
             "vectors_count": collection_info.vectors_count,
             "points_count": collection_info.points_count,
-            "status": "active"
+            "status": "active",
         }
-        
+
         print(f">>>>> Qdrant Debug Info: {info}")
         return CollectionInfo(**info)
-        
+
     except Exception as e:
         print(f">>>>> Qdrant Debug Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get Qdrant status: {str(e)}")
-
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get Qdrant status: {str(e)}"
+        )

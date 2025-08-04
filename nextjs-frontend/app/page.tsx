@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DiffViewer } from '@/components/ui/diff-viewer';
-import { 
-  Search, 
-  BookOpen, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Search,
+  BookOpen,
+  CheckCircle,
+  XCircle,
   Edit3,
   AlertTriangle,
   Clock,
@@ -67,7 +67,7 @@ export default function Home() {
       });
 
       console.log('Response status:', res.status);
-      
+
       if (!res.ok) {
         const errorText = await res.text();
         console.error('Backend error response:', errorText);
@@ -152,10 +152,10 @@ export default function Home() {
 
   const handleApproveAll = () => {
     const newDecisions: Record<string, 'approve' | 'reject' | 'modify'> = {};
-    visibleDocuments.forEach((doc, visibleIndex) => {
-      const originalIndex = response?.documents_to_update.findIndex(d => 
-        d.file === doc.file && 
-        d.action === doc.action && 
+    visibleDocuments.forEach((doc) => {
+      const originalIndex = response?.documents_to_update.findIndex(d =>
+        d.file === doc.file &&
+        d.action === doc.action &&
         d.reason === doc.reason &&
         d.original_content === doc.original_content &&
         d.new_content === doc.new_content
@@ -172,10 +172,10 @@ export default function Home() {
 
   const handleRejectAll = () => {
     const newDecisions: Record<string, 'approve' | 'reject' | 'modify'> = {};
-    visibleDocuments.forEach((doc, visibleIndex) => {
-      const originalIndex = response?.documents_to_update.findIndex(d => 
-        d.file === doc.file && 
-        d.action === doc.action && 
+    visibleDocuments.forEach((doc) => {
+      const originalIndex = response?.documents_to_update.findIndex(d =>
+        d.file === doc.file &&
+        d.action === doc.action &&
         d.reason === doc.reason &&
         d.original_content === doc.original_content &&
         d.new_content === doc.new_content
@@ -209,10 +209,10 @@ export default function Home() {
       }
 
       // Update documents with edited content if any
-      const documentsToSave = approvedDocuments.map((doc, index) => {
+      const documentsToSave = approvedDocuments.map((doc) => {
         const docId = `doc-${response.documents_to_update.indexOf(doc)}`;
         const editedContent = editableContent[docId];
-        
+
         return {
           ...doc,
           new_content: editedContent || doc.new_content
@@ -238,10 +238,10 @@ export default function Home() {
 
       const saveResponse = await res.json();
       setSaveStatus(`Successfully saved ${saveResponse.saved_count} changes!`);
-      
+
       // Show confirmation popup instead of auto-clearing
       setShowSaveConfirmation(true);
-      
+
       // Clear the form after successful save
       setTimeout(() => {
         setResponse(null);
@@ -311,8 +311,8 @@ export default function Home() {
                   disabled={isLoading}
                 />
               </div>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isLoading || !query.trim()}
                 className="w-full sm:w-auto"
               >
@@ -376,21 +376,21 @@ export default function Home() {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     {visibleDocuments.map((doc, visibleIndex) => {
-                      const originalIndex = response.documents_to_update.findIndex(d => 
-                        d.file === doc.file && 
-                        d.action === doc.action && 
+                      const originalIndex = response.documents_to_update.findIndex(d =>
+                        d.file === doc.file &&
+                        d.action === doc.action &&
                         d.reason === doc.reason &&
                         d.original_content === doc.original_content &&
                         d.new_content === doc.new_content
                       );
                       const docId = `doc-${originalIndex}`;
                       const isEditingThisDoc = isEditing[docId] || false;
-                      
+
                       return (
                         <div key={`${doc.file}-${visibleIndex}-${doc.action}`} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
                           <div className="flex items-start justify-between mb-2">
@@ -435,14 +435,14 @@ export default function Home() {
                       );
                     })}
                   </div>
-                  
+
                   {/* Show diff for the first document with content */}
                   {(() => {
                     const firstDocWithContent = visibleDocuments.find(doc => doc.original_content && doc.new_content);
                     if (firstDocWithContent) {
-                      const originalIndex = response.documents_to_update.findIndex(d => 
-                        d.file === firstDocWithContent.file && 
-                        d.action === firstDocWithContent.action && 
+                      const originalIndex = response.documents_to_update.findIndex(d =>
+                        d.file === firstDocWithContent.file &&
+                        d.action === firstDocWithContent.action &&
                         d.reason === firstDocWithContent.reason &&
                         d.original_content === firstDocWithContent.original_content &&
                         d.new_content === firstDocWithContent.new_content
@@ -450,7 +450,7 @@ export default function Home() {
                       const docId = `doc-${originalIndex}`;
                       const isEditingThisDoc = isEditing[docId] || false;
                       const currentContent = editableContent[docId] || firstDocWithContent.new_content || '';
-                      
+
                       return (
                         <div>
                           <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Proposed Changes</h4>
@@ -513,7 +513,7 @@ export default function Home() {
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-4">
-              <Button 
+              <Button
                 disabled={Object.keys(reviewDecisions).length === 0 || isSaving}
                 onClick={saveChanges}
               >

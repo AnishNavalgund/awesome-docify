@@ -5,7 +5,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:80
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     const response = await fetch(`${BACKEND_URL}/api/v1/save-change`, {
       method: 'POST',
       headers: {
@@ -27,4 +27,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

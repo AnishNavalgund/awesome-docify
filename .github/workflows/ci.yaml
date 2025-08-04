@@ -1,0 +1,45 @@
+name: CI Pipeline
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Python files
+        run: |
+          echo "Checking Python files..."
+          python -m py_compile fastapi_backend/app/main.py
+          python -m py_compile fastapi_backend/app/config.py
+          echo "Python files are valid!"
+
+      - name: Check package.json
+        run: |
+          echo "Checking package.json..."
+          node -e "JSON.parse(require('fs').readFileSync('nextjs-frontend/package.json', 'utf8'))"
+          echo "package.json is valid!"
+
+      - name: Check Docker Compose
+        run: |
+          echo "Checking Docker Compose..."
+          docker-compose config
+          echo "Docker Compose is valid!"
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker Images
+        run: |
+          echo "Building Docker images..."
+          docker-compose build
+          echo "Build successful!"
+          echo "App is ready to deploy!"

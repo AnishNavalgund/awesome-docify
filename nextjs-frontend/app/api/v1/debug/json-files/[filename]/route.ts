@@ -9,11 +9,11 @@ export async function GET(
   try {
     const filename = decodeURIComponent(params.filename);
     const response = await fetch(`${BACKEND_URL}/api/v1/debug/json-files/${encodeURIComponent(filename)}`);
-    
+
     if (!response.ok) {
       throw new Error(`Backend responded with status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
@@ -23,4 +23,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}

@@ -1,24 +1,22 @@
-from fastapi import APIRouter, HTTPException
 from pathlib import Path
-from datetime import datetime
-from typing import Dict, Any
+from typing import Dict
+
+from app.ai_engine_service.rag_engine import orchestrator
+from app.config import settings
+from app.database import AsyncSessionLocal, save_document_version_and_update
+from app.models import Document
 from app.schemas import (
+    CollectionInfo,
+    DocumentUpdate,
     QueryRequest,
     QueryResponse,
     SaveChangeRequest,
     SaveChangeResponse,
     SavedChange,
-    CollectionInfo,
-    DocumentUpdate,
 )
-from app.ai_engine_service.rag_engine import orchestrator
-from app.utils import logger_info, logger_error
+from app.utils import logger_error, logger_info
+from fastapi import APIRouter, HTTPException
 from qdrant_client import QdrantClient
-from app.config import settings
-from app.database import save_document_version_and_update
-from app.models import Document
-from app.database import AsyncSessionLocal
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 router = APIRouter(prefix="/api/v1", tags=["Docify"])
@@ -44,21 +42,20 @@ async def query_docs(request: QueryRequest):
                 file="unknown_document.json",
                 action="modify",
                 reason=f"Error occurred while analyzing query: {request.query}",
-                section=None
+                section=None,
             )
         ]
         return QueryResponse(
             query=request.query,
             analysis=f"Error occurred while analyzing query: {request.query}",
             documents_to_update=fallback_docs,
-            total_documents=1
+            total_documents=1,
         )
 
 
 @router.post("/save-change", response_model=SaveChangeResponse)
 async def save_change(request: SaveChangeRequest):
-
-    print(f">>>>> Saving changes")
+    print(">>>>> Saving changes")
     """
     Save the user-approved changes to the database (with versioning)
     """
@@ -72,36 +69,33 @@ async def save_change(request: SaveChangeRequest):
                 )
                 doc = result.scalar_one_or_none()
                 if not doc:
-                    continue  
+                    continue
 
                 # Update content if provided
                 if doc_update.new_content is not None:
                     doc.content = doc_update.new_content
 
-                # Save version and update 
+                # Save version and update
                 await save_document_version_and_update(
                     session=session,
                     document_id=doc.doc_id,
                     new_content=doc.content,  # use the possibly updated content
                     updated_by=request.approved_by,
-                    notes=doc_update.reason
+                    notes=doc_update.reason,
                 )
                 saved_count += 1
 
-        print(f">>>>> Saved in the database!!!")
+        print(">>>>> Saved in the database!!!")
 
-        return SaveChangeResponse(
-            status="success",
-            saved_count=saved_count
-        )
+        return SaveChangeResponse(status="success", saved_count=saved_count)
 
     except Exception as e:
         logger_error.error(f"Error saving changes: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save changes: {str(e)}")
 
 
-#@router.get("/saved-changes", response_model=GetSavedChangesResponse)
-#async def get_saved_changes():
+# @router.get("/saved-changes", response_model=GetSavedChangesResponse)
+# async def get_saved_changes():
 #    """
 #    Retrieve all saved changes from in-memory storage
 #    """
@@ -116,8 +110,8 @@ async def save_change(request: SaveChangeRequest):
 #        raise HTTPException(status_code=500, detail=f"Failed to retrieve saved changes: {str(e)}")
 
 # For future use
-#@router.post("/ingest", response_model=IngestResponse)
-#async def manual_ingest(request: IngestRequest):
+# @router.post("/ingest", response_model=IngestResponse)
+# async def manual_ingest(request: IngestRequest):
 #    """
 #    Manually trigger ingestion from a directory
 #    """
@@ -138,24 +132,25 @@ async def collection_info():
     Get vector DB collection info
     """
     try:
-        
         # Initialize Qdrant client
         qdrant_path = Path(settings.QDRANT_PATH)
         client = QdrantClient(path=str(qdrant_path))
-        
+
         # Get collection info
         collection_info = client.get_collection(settings.QDRANT_COLLECTION_NAME)
-        
+
         info = {
             "name": settings.QDRANT_COLLECTION_NAME,
             "vectors_count": collection_info.vectors_count,
             "points_count": collection_info.points_count,
-            "status": "active"
+            "status": "active",
         }
-        
+
         logger_info.info(f">>>>> Collection info received: {info}")
         return CollectionInfo(**info)
-        
+
     except Exception as e:
         logger_error.error(f"Error getting collection info: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get collection info: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get collection info: {str(e)}"
+        )
