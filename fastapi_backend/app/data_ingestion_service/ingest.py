@@ -85,20 +85,20 @@ async def chunk_documents(docs):
 # === Step 3: Embed & Store in Qdrant ===
 async def ingest_to_qdrant(docs):
     logger_info.info(f"Processing {len(docs)} document chunks...")
-    
+
     # Initialize embeddings with batch processing
     embeddings = OpenAIEmbeddings(
         model=settings.EMBEDDING_MODEL, 
         openai_api_key=settings.OPENAI_API_KEY,
         chunk_size=settings.EMBEDDING_BATCH_SIZE
     )
-    
+
     # Initialize Qdrant client with local file storage
     qdrant_path = Path(settings.QDRANT_PATH)
     qdrant_path.mkdir(parents=True, exist_ok=True)
-    
+
     client = QdrantClient(path=str(qdrant_path))
-    
+
     # Create collection if it doesn't exist
     try:
         client.get_collection(QDRANT_COLLECTION_NAME)
@@ -109,18 +109,36 @@ async def ingest_to_qdrant(docs):
             vectors_config=VectorParams(size=settings.VECTOR_DIMENSION, distance=Distance.COSINE),
         )
         logger_info.info(f"Created collection '{QDRANT_COLLECTION_NAME}'")
-    
+
     # Initialize vector store
     vector_store = QdrantVectorStore(
         client=client,
         collection_name=QDRANT_COLLECTION_NAME,
         embedding=embeddings,
     )
-    
+
+    # Flatten metadata to ensure top-level payload
+    flattened_docs = []
+    chunk_id_log_path = Path("chunk_ids.txt")
+    with chunk_id_log_path.open("w") as f:
+        for doc in docs:
+            flat_metadata = {**doc.metadata}  # ensure no nested 'metadata' inside
+            chunk_id = flat_metadata.get("chunk_id")
+            if not chunk_id:
+                logger_error.error("Missing chunk_id in document metadata!")
+            #f.write(f"{chunk_id}\n")
+            flattened_docs.append(Document(
+                page_content=doc.page_content,
+                metadata=flat_metadata
+            ))
+
     # Add documents to the vector store in batches
-    for i in range(0, len(docs), settings.INGESTION_BATCH_SIZE):
-        batch = docs[i:i + settings.INGESTION_BATCH_SIZE]
+    for i in range(0, len(flattened_docs), settings.INGESTION_BATCH_SIZE):
+        batch = flattened_docs[i:i + settings.INGESTION_BATCH_SIZE]
+        #logger_info.info("Ingesting chunk_ids:")
+        #for doc in batch:
+        #    logger_info.info(f"  - {doc.metadata.get('chunk_id')}")
         vector_store.add_documents(batch)
-        logger_info.info(f"Processed batch {i//settings.INGESTION_BATCH_SIZE + 1}/{(len(docs) + settings.INGESTION_BATCH_SIZE - 1)//settings.INGESTION_BATCH_SIZE} ({len(batch)} chunks)")
-    
-    print(f"Ingested {len(docs)} chunks into Qdrant!")
+        logger_info.info(f"Processed batch {i//settings.INGESTION_BATCH_SIZE + 1}/{(len(flattened_docs) + settings.INGESTION_BATCH_SIZE - 1)//settings.INGESTION_BATCH_SIZE} ({len(batch)} chunks)")
+
+    print(f"Ingested {len(flattened_docs)} chunks into Qdrant!")

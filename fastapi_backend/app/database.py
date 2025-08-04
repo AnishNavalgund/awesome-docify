@@ -8,6 +8,8 @@ from .config import settings
 from .models import Base, Document, DocumentVersion, DocumentChunk
 import datetime
 from uuid import UUID
+from contextlib import asynccontextmanager
+import logging
 
 # Get the project root directory
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -17,6 +19,16 @@ SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+logger_error = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def get_db_session():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session   
+        finally:
+            await session.close()
+    
 #async def get_db() -> AsyncGenerator[AsyncSession, None]:
 #    """Dependency to get async database session"""
 #    async with AsyncSessionLocal() as session:
@@ -116,12 +128,25 @@ async def save_document_version_and_update(
 async def save_chunks_to_postgres(chunks: List[Document], session: AsyncSession):
     for chunk in chunks:
         meta = chunk.metadata
-        db_chunk = DocumentChunk(
-            chunk_id=meta["chunk_id"],
-            doc_id=meta["doc_id"],
-            chunk_index=meta["chunk_index"],
-            chunk_type=meta.get("chunk_type", "recursive"),
-            content=chunk.page_content
-        )
-        session.add(db_chunk)
+        if "chunk_id" not in meta:
+            logger_error.error(f"Missing chunk_id in chunk metadata: {meta}")
+            continue  # Skip this chunk if no chunk_id
+            
+        try:
+            # Convert string chunk_id to UUID object for database storage
+            chunk_id_uuid = UUID(meta["chunk_id"]) if isinstance(meta["chunk_id"], str) else meta["chunk_id"]
+            doc_id_uuid = UUID(meta["doc_id"]) if isinstance(meta["doc_id"], str) else meta["doc_id"]
+            
+            db_chunk = DocumentChunk(
+                chunk_id=chunk_id_uuid,
+                doc_id=doc_id_uuid,
+                chunk_index=meta["chunk_index"],
+                chunk_type=meta.get("chunk_type", "recursive"),
+                content=chunk.page_content
+            )
+            session.add(db_chunk)
+        except (ValueError, TypeError) as e:
+            logger_error.error(f"Invalid UUID format for chunk_id {meta.get('chunk_id')} or doc_id {meta.get('doc_id')}: {e}")
+            continue
+            
     await session.commit()

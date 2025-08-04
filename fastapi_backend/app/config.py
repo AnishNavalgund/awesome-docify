@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     MIN_CHARS_PER_CHUNK: int = 100
     
     # Similarity score threshold
-    MIN_SIMILARITY_SCORE: float = 0.3    # Minimum similarity score to include document
+    MIN_SIMILARITY_SCORE: float = 0.1    # Minimum similarity score to include document
     
     # Qdrant settings
     QDRANT_PATH: str = "../local-shared-data/qdrant"
