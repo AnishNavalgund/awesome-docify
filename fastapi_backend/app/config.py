@@ -23,11 +23,11 @@ class Settings(BaseSettings):
     MIN_SIMILARITY_SCORE: float = 0.1  # Minimum similarity score to include document
 
     # Qdrant settings
-    QDRANT_PATH: str = "../local-shared-data/qdrant"
+    QDRANT_PATH: str
     QDRANT_COLLECTION_NAME: str = "openai_docs"
 
     # Document loader settings
-    DOCUMENT_LOADER_DIR: str = "../local-shared-data/docs"
+    DOCUMENT_LOADER_DIR: str
 
     # Document chunking settings
     CHUNK_SIZE: int = 4000
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
         return {origin.strip() for origin in self.CORS_ORIGINS_STR.split(",")}
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file="../.env", env_file_encoding="utf-8", extra="ignore"
     )
 
 

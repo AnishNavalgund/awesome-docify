@@ -1,4 +1,4 @@
-# Makefile
+# Makefile for Awesome Docify
 
 # Variables
 BACKEND_DIR=fastapi_backend
@@ -9,66 +9,52 @@ DOCKER_COMPOSE=docker compose
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@awk '/^[a-zA-Z_-]+:/{split($$1, target, ":"); print "  " target[1] "\t" substr($$0, index($$0,$$2))}' $(MAKEFILE_LIST)
+	@awk '/^[a-zA-Z_-]+:.*?##/ { printf "  %-20s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-# Backend commands
-.PHONY: start-backend test-backend
+# Development commands
+.PHONY: install start-backend start-frontend dev
 
-start-backend: ## Start the backend server with FastAPI and hot reload
+install: ## Install all dependencies
+	cd $(BACKEND_DIR) && uv sync
+	cd $(FRONTEND_DIR) && pnpm install
+
+start-backend: ## Start backend server locally
 	cd $(BACKEND_DIR) && ./start.sh
 
-test-backend: ## Run backend tests using pytest
-	cd $(BACKEND_DIR) && uv run pytest
+start-frontend: ## Start frontend server locally
+	cd $(FRONTEND_DIR) && npm run dev
 
-
-# Frontend commands
-.PHONY: start-frontend test-frontend
-
-start-frontend: ## Start the frontend server with pnpm and hot reload
-	cd $(FRONTEND_DIR) && ./start.sh
-
-test-frontend: ## Run frontend tests using npm
-	cd $(FRONTEND_DIR) && pnpm run test
-
-# Local application commands
-.PHONY: start-local-application
-
-start-local-application: ## Start frontend and backend concurrently
-	(cd $(FRONTEND_DIR) && pnpm dev) & \
-	(cd $(BACKEND_DIR) && ./start.sh)
+dev: ## Start both frontend and backend locally
+	@echo "Starting backend first..."
+	@cd $(BACKEND_DIR) && ./start.sh & \
+	BACKEND_PID=$$!; \
+	until curl -s http://localhost:8000/health > /dev/null; do \
+		sleep 1; \
+	done; \
+	echo "Backend is ready! Starting frontend..."; \
+	make start-frontend & \
+	wait $$BACKEND_PID
 
 # Docker commands
-.PHONY: docker-backend-shell docker-frontend-shell docker-build docker-build-backend \
-        docker-build-frontend docker-start-backend docker-start-frontend docker-up-test-db \
-        docker-test-backend docker-test-frontend
+.PHONY: docker-up docker-down docker-build docker-logs
 
+docker-up: ## Start all services with Docker Compose
+	$(DOCKER_COMPOSE) up -d
 
-docker-backend-shell: ## Access the backend container shell
-	$(DOCKER_COMPOSE) run --rm backend sh
+docker-down: ## Stop all Docker services
+	$(DOCKER_COMPOSE) down
 
-docker-frontend-shell: ## Access the frontend container shell
-	$(DOCKER_COMPOSE) run --rm frontend sh
+docker-build: ## Build Docker images
+	$(DOCKER_COMPOSE) build
 
-docker-build: ## Build all the services
-	$(DOCKER_COMPOSE) build --no-cache
+docker-logs: ## Show Docker logs
+	$(DOCKER_COMPOSE) logs -f
 
-docker-build-backend: ## Build the backend container with no cache
-	$(DOCKER_COMPOSE) build backend --no-cache
+# Utility commands
+.PHONY: clean status
 
-docker-build-frontend: ## Build the frontend container with no cache
-	$(DOCKER_COMPOSE) build frontend --no-cache
+clean: ## Clean up Docker containers and images
+	$(DOCKER_COMPOSE) down -v --rmi all
 
-docker-start-backend: ## Start the backend container
-	$(DOCKER_COMPOSE) up backend
-
-docker-start-frontend: ## Start the frontend container
-	$(DOCKER_COMPOSE) up frontend
-
-docker-up-test-db: ## Start the test database container
-	$(DOCKER_COMPOSE) up db_test
-
-docker-test-backend: ## Run tests for the backend
-	$(DOCKER_COMPOSE) run --rm backend pytest
-L
-docker-test-frontend: ## Run tests for the frontend
-	$(DOCKER_COMPOSE) run --rm frontend pnpm run test
+status: ## Show status of all services
+	$(DOCKER_COMPOSE) ps

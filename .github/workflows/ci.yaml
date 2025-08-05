@@ -27,7 +27,16 @@ jobs:
       - name: Check Docker Compose
         run: |
           echo "Checking Docker Compose..."
-          docker-compose config
+          # Create a minimal .env file for CI validation
+          echo "# CI Environment Variables" > .env
+          echo "OPENAI_API_KEY=ci_test_key" >> .env
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/awesome_docify" >> .env
+          echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8000" >> .env
+          echo "API_BASE_URL=http://localhost:8000" >> .env
+          echo "QDRANT_PATH=../local-shared-data/qdrant" >> .env
+          echo "QDRANT_COLLECTION_NAME=openai_docs" >> .env
+          echo "DOCUMENT_LOADER_DIR=../local-shared-data/docs" >> .env
+          docker compose config
           echo "Docker Compose is valid!"
 
   build:
@@ -40,6 +49,15 @@ jobs:
       - name: Build Docker Images
         run: |
           echo "Building Docker images..."
-          docker-compose build
+          # Create a minimal .env file for CI build
+          echo "# CI Environment Variables" > .env
+          echo "OPENAI_API_KEY=ci_test_key" >> .env
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/awesome_docify" >> .env
+          echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8000" >> .env
+          echo "API_BASE_URL=http://localhost:8000" >> .env
+          echo "QDRANT_PATH=../local-shared-data/qdrant" >> .env
+          echo "QDRANT_COLLECTION_NAME=openai_docs" >> .env
+          echo "DOCUMENT_LOADER_DIR=../local-shared-data/docs" >> .env
+          docker compose build
           echo "Build successful!"
           echo "App is ready to deploy!"

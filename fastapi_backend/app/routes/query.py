@@ -141,8 +141,8 @@ async def collection_info():
 
         info = {
             "name": settings.QDRANT_COLLECTION_NAME,
-            "vectors_count": collection_info.vectors_count,
-            "points_count": collection_info.points_count,
+            "vectors_count": collection_info.vectors_count or 0,
+            "points_count": collection_info.points_count or 0,
             "status": "active",
         }
 
@@ -151,6 +151,10 @@ async def collection_info():
 
     except Exception as e:
         logger_error.error(f"Error getting collection info: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get collection info: {str(e)}"
+        # Return a default response when Qdrant is not available
+        return CollectionInfo(
+            name=settings.QDRANT_COLLECTION_NAME,
+            vectors_count=0,
+            points_count=0,
+            status="unavailable",
         )

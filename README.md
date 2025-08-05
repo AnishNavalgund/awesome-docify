@@ -55,8 +55,28 @@ cd ../nextjs-frontend
 pnpm install
 ```
 
-### 3. Start the application
-**Option A: Using Docker**
+### 3. Configure Environment Variables
+
+Create a `.env` file in the root directory:
+
+```bash
+# Copy the example environment file
+cp env.example .env
+
+# Edit the .env file with your API keys
+nano .env
+```
+
+**Required Environment Variables:**
+- `OPENAI_API_KEY` - Your OpenAI API key (required)
+
+**Optional Environment Variables:**
+- `LLM_MODEL` - OpenAI model (default: gpt-4o)
+- `EMBEDDING_MODEL` - Embedding model (default: text-embedding-3-small)
+
+### 4. Start the application
+
+**Option A: Using Docker (Recommended)**
 ```bash
 docker compose up -d
 ```
@@ -65,9 +85,6 @@ docker compose up -d
 ```bash
 # Start backend
 cd fastapi_backend
-# Start qdrant database
-docker compose up qdrant -d
-# Start backend
 uv run uvicorn app.main:app --reload
 
 # Start frontend (in another terminal)
@@ -78,12 +95,12 @@ pnpm dev
 docker compose up db -d
 ```
 
-### 4. Access the application
+### 5. Access the application
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 - **Postgres Database**: http://localhost:5432
-- **Qdrant Database**: http://localhost:6333
+- **Qdrant Database**: http://localhost:6333 (if running locally)
 
 ## Code Quality with Pre-commit
 
@@ -101,23 +118,6 @@ pre-commit install
 # Run on all files (first time)
 pre-commit run --all-files
 ```
-
-### What Pre-commit Does
-
-**🔍 Basic Checks:**
-- Removes trailing whitespace
-- Ensures files end with newline
-- Validates YAML/JSON files
-- Catches merge conflicts
-
-**🐍 Python (Backend):**
-- **Black** - Code formatting
-- **isort** - Import organization
-- **Ruff** - Linting and formatting
-
-**⚛️ Frontend (Next.js):**
-- TypeScript type checking
-- ESLint code quality checks
 
 ### Usage
 

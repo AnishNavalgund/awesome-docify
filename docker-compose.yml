@@ -1,22 +1,22 @@
-version: "3.8"
-
 services:
   backend:
     build:
       context: fastapi_backend
+    env_file:
+      - .env
     environment:
-      - OPENAPI_OUTPUT_FILE=./shared-data/openapi.json
       - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/awesome_docify
+      - QDRANT_PATH=/app/local-shared-data/qdrant
+      - DOCUMENT_LOADER_DIR=/app/local-shared-data/docs
     ports:
       - "8000:8000"
     networks:
       - my_network
     volumes:
       - ./fastapi_backend:/app
-      - ./local-shared-data:/app/shared-data
+      - ./local-shared-data:/app/local-shared-data
     depends_on:
       - db
-      - qdrant
 
   db:
     image: postgres:17
@@ -31,16 +31,6 @@ services:
     volumes:
       - ./local-shared-data/postgres:/var/lib/postgresql/data
 
-  qdrant:
-    image: qdrant/qdrant
-    container_name: qdrant
-    ports:
-      - "6333:6333"
-    networks:
-      - my_network
-    volumes:
-      - ./local-shared-data/qdrant:/qdrant/storage
-
   frontend:
     build:
       context: ./nextjs-frontend
@@ -49,14 +39,15 @@ services:
       - "3000:3000"
     networks:
       - my_network
+    env_file:
+      - .env
     environment:
       NODE_ENV: development
       API_BASE_URL: http://backend:8000
-      OPENAPI_OUTPUT_FILE: ./shared-data/openapi.json
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000
     volumes:
       - ./nextjs-frontend:/app
       - nextjs-node-modules:/app/node_modules
-      - ./local-shared-data:/app/shared-data
 
 volumes:
   nextjs-node-modules:
