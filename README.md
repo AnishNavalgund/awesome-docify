@@ -2,183 +2,153 @@
 
 Your AI assistant for painless documentation updates.
 
-## Tech Stack
+---
 
-- [**Next.js 15**](https://nextjs.org/) - React framework with App Router
-- [**FastAPI**](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [**TypeScript**](https://www.typescriptlang.org/) - Type-safe development
-- [**Tailwind CSS**](https://tailwindcss.com/) - Utility-first CSS framework
-- [**shadcn/ui**](https://ui.shadcn.com/) - Beautiful React components
-- [**Docker**](https://www.docker.com/) - Containerized development environment
+### Overview
 
-## Prerequisites
+Information changes fast, and keeping knowledge up to date is difficult. Companies need to keep their documentation accurate, but it's difficult for them to figure out all the places where they need to update information. This is the case each time there's a new product update. This tool is a solution to this problem. With this tool, you can:
 
-Before getting started, ensure you have the following tools installed:
+1. Upload your documentation in json format.
+2. Query the documentation with a natural language query.
+3. The AI assistant returns the most relevant documents and the changes to the documents as a diff view on the web-app.
+3. User can accecpt/reject/modify the changes.
+4. User can then save those changes.
 
-- **UV** - Fast Python package manager
-- **PNPM** - Fast Next.js & React package manager
-- **Make** - Build automation tool
-- **Docker** - Containerization platform
-- **Docker Compose** - Multi-container orchestration
+---
 
-**For detailed installation instructions, see [docs/prerequisites.md](docs/prerequisites.md)**
+### Architecture
 
-### Quick Verification
+![Architecture](docs/images/AD_Arch.png)
 
-Run this command to verify all prerequisites are installed:
+---
+
+### Project Structure
 
 ```bash
-echo "UV: $(uv --version)" && echo "PNPM: $(pnpm --version)" && echo "Make: $(make --version)" && echo "Docker: $(docker --version)" && echo "Docker Compose: $(docker compose version)"
+awesome-docify/
+├── fastapi_backend/        # Backend
+├── nextjs-frontend/        # Frontend
+├── local-shared-data/      # Local data
+│   ├── docs/               # Input json files
+│   └── qdrant/             # Vector database data
+├── docs/                   # Documentation
+├── .github/                # CI/CD
+├── docker-compose.yml      # Docker compose file
+├── Makefile                # Makefile
+├── README.md               # This file
+├── env.example             # Environment variables example
+├── .pre-commit-config.yaml # Pre-commit config
+├── .gitignore              # Git ignore rules
+└── LICENSE.txt             # License
 ```
 
-## Getting Started
+Refer [fastapi_backend/README.md](fastapi_backend/README.md) and [nextjs-frontend/README.md](nextjs-frontend/README.md) for tech stack and file structure.
 
-### 1. Clone the repository
+---
+
+### Prerequisites
+
+See [docs/prerequisites.md](docs/prerequisites.md).
+
+---
+
+### Getting Started
+
+#### 1. Clone the repository
 ```bash
 git clone https://github.com/AnishNavalgund/awesome-docify.git
 cd awesome-docify
 ```
 
-### 2. Install dependencies
+#### 2. Save the input documents and make a directory for the qdrant database
 
-```bash
-# Install all dependencies (backend + frontend)
-make install
+Recommendation: `local-shared-data/docs` for jsons and `local-shared-data/qdrant` for the qdrant database. If changed, update CI workflow to use the new directories.
 
-# Or install manually:
-# Backend dependencies
-cd fastapi_backend
-uv sync
+#### 3. Configure Environment Variables
 
-# Frontend dependencies
-cd ../nextjs-frontend
-pnpm install
-```
+Create a `.env` file in the root directory and fill in the required environment variables by refering to `.env.example`
 
-### 3. Configure Environment Variables
+#### 4. Start the application
 
-Create a `.env` file in the root directory:
+#### **Option A: Using Docker**
 
-```bash
-# Copy the example environment file
-cp env.example .env
-
-# Edit the .env file with your API keys
-nano .env
-```
-
-**Required Environment Variables:**
-- `OPENAI_API_KEY` - Your OpenAI API key (required)
-
-**Optional Environment Variables:**
-- `LLM_MODEL` - OpenAI model (default: gpt-4o)
-- `EMBEDDING_MODEL` - Embedding model (default: text-embedding-3-small)
-
-### 4. Start the application
-
-**Option A: Using Docker (Recommended)**
 ```bash
 docker compose up -d
 ```
+Note: The backend will take a while to start up. Please observe the logs to ensure the backend application is ready.
 
-**Option B: Local Development**
+---
+
+#### **Option B: Local Development**
+
+##### B1. Install dependencies (backend + frontend)
+
 ```bash
-# Start backend
-cd fastapi_backend
-uv run uvicorn app.main:app --reload
-
-# Start frontend (in another terminal)
-cd nextjs-frontend
-pnpm dev
-
-# Postgres Database
-docker compose up db -d
+cd fastapi_backend && uv sync && cd ../nextjs-frontend && pnpm install
 ```
 
-### 5. Access the application
+##### B2. Source the environment
+
+```bash
+cd fastapi_backend && source .venv/bin/activate
+```
+##### B3. Pre-commit hooks
+
+```bash
+pre-commit install
+```
+
+##### B4. Start the Postgres database
+
+```bash
+docker compose up -d db
+```
+
+##### B5. Start the application
+
+```bash
+cd fastapi_backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+in another terminal, start the frontend
+
+```bash
+cd nextjs-frontend && npm run dev
+```
+
+##### B6. Access the application
+
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-- **Postgres Database**: http://localhost:5432
-- **Qdrant Database**: http://localhost:6333 (if running locally)
 
-## Code Quality with Pre-commit
+---
 
-This project uses pre-commit hooks to ensure code quality and consistency.
+### API Documentation
 
-### Setup Pre-commit
+See [docs/api_documentation.md](docs/api_documentation.md). or, access the API documentation at http://localhost:8000/docs after running the backend.
 
-```bash
-# Install pre-commit
-pip install pre-commit
+---
 
-# Install the git hooks
-pre-commit install
+### Available Makefile Commands
 
-# Run on all files (first time)
-pre-commit run --all-files
-```
+See [docs/make_commands.md](docs/make_commands.md).
 
-### Usage
+---
 
-Pre-commit runs automatically on every commit. If any checks fail:
-1. Fix the issues
-2. Stage the fixed files
-3. Commit again
+### Example Test Queries
+1. "the function run_demo_loop will be changed to run_demo_in_loop"
+2. "MCPToolApprovalFunction  will be removed"
+3. "A new exception "ModelCallError" will be supported "
 
-**Manual run:**
-```bash
-# Run on staged files
-pre-commit run
+---
 
-# Run on all files
-pre-commit run --all-files
+### Limitations
+The MVP was designed giving importance to LLM cost, speed and the overall backend development. It works well for simple ADD/MODIFY/DELETE updates demonstrating the technology. It struggles with complex queries and cross-document relationships. This can be further optimized.
 
-# Run specific hook
-pre-commit run black
-```
+---
 
-## Project Structure
-
-```
-awesome-docify/
-├── fastapi_backend/          # FastAPI backend
-│   ├── app/                 # Application code
-│   ├── tests/               # Backend tests
-│   └── pyproject.toml       # Python dependencies
-├── nextjs-frontend/         # Next.js frontend
-│   ├── app/                 # App Router pages
-│   ├── components/          # React components
-│   └── package.json         # Node.js dependencies
-├── docs/                    # Documentation
-├── docker-compose.yml       # Docker services
-└── Makefile                 # Build automation
-```
-
-## Available Commands
-
-### Make Commands (Local Development/Deployment)
-- `make install` - Install all dependencies
-- `make start-local-application` - Start local application
-- `make build-frontend` - Build frontend for production
-- `make lint-frontend` - Run ESLint
-- `make test-frontend` - Run frontend tests
-- `make start-frontend` - Start frontend
-- `make test-backend` - Run backend tests
-- `make coverage-backend` - Run backend tests with coverage
-- `make start-backend` - Start backend
-- `make migrate` - Run database migrations
-- `make reset-db` - Reset database
-
-### Docker Commands
-- `docker compose up -d` - Start all services
-- `docker compose down` - Stop all services
-- `docker compose logs -f` - View logs
-- `docker compose up backend -d` - Start backend only
-- `docker compose up frontend -d` - Start frontend only
-- `docker compose up db -d` - Start database only
-
-
-## License
+### License
 
 This project is open source and available under the [MIT License](LICENSE.txt).
+
+---

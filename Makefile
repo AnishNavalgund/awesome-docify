@@ -9,7 +9,7 @@ DOCKER_COMPOSE=docker compose
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@awk '/^[a-zA-Z_-]+:.*?##/ { printf "  %-20s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk '/^[a-zA-Z_-]+:.*?##/ { printf "  %-20s %s\n", $$1, $$2 }' $(MAKEFILE_LIST) | head -10
 
 # Development commands
 .PHONY: install start-backend start-frontend dev
@@ -24,19 +24,8 @@ start-backend: ## Start backend server locally
 start-frontend: ## Start frontend server locally
 	cd $(FRONTEND_DIR) && npm run dev
 
-dev: ## Start both frontend and backend locally
-	@echo "Starting backend first..."
-	@cd $(BACKEND_DIR) && ./start.sh & \
-	BACKEND_PID=$$!; \
-	until curl -s http://localhost:8000/health > /dev/null; do \
-		sleep 1; \
-	done; \
-	echo "Backend is ready! Starting frontend..."; \
-	make start-frontend & \
-	wait $$BACKEND_PID
-
 # Docker commands
-.PHONY: docker-up docker-down docker-build docker-logs
+.PHONY: docker-up docker-down docker-build docker-logs docker-status
 
 docker-up: ## Start all services with Docker Compose
 	$(DOCKER_COMPOSE) up -d
@@ -50,11 +39,5 @@ docker-build: ## Build Docker images
 docker-logs: ## Show Docker logs
 	$(DOCKER_COMPOSE) logs -f
 
-# Utility commands
-.PHONY: clean status
-
-clean: ## Clean up Docker containers and images
-	$(DOCKER_COMPOSE) down -v --rmi all
-
-status: ## Show status of all services
+docker-status: ## Show Docker status
 	$(DOCKER_COMPOSE) ps
