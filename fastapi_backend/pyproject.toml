@@ -14,7 +14,6 @@ dependencies = [
     "watchdog>=5.0.0,<6.0.0",
     "openai>=1.98.0",
     "qdrant-client>=1.15.0",
-    "tqdm>=4.67.1",
     "python-dotenv>=1.0.1",
     "langchain>=0.2.0",
     "langchain-openai>=0.1.0",
@@ -29,12 +28,8 @@ dev = [
     "watchdog>=5.0.3,<6",
     "python-dotenv>=1.0.1,<2",
     "pytest>=8.3.3,<9",
-    "pytest-mock>=3.14.0,<4",
     "mypy>=1.13.0,<2",
-    "coveralls>=4.0.1,<5",
-    "pytest-asyncio>=0.24.0,<0.25",
-    "mkdocs-material>=9.6.9",
-    "mkdocs-material[imaging]>=9.6.9",
+    "pytest-cov>=6.2.1",
 ]
 
 [tool.uv]

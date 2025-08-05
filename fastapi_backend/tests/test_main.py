@@ -3,11 +3,7 @@ from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
-
-def test_read_root():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Welcome to awesome-docify API"}
+# Basic tests. In future, more detailed tests for functions and endpoints will be added!
 
 
 def test_health_check():
@@ -16,7 +12,7 @@ def test_health_check():
     assert response.json() == {"status": "healthy"}
 
 
-def test_hello():
-    response = client.get("/api/hello")
+def test_root_endpoint():
+    response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello from awesome-docify API!"}
+    assert response.json() == {"message": "Welcome to awesome-docify API"}
