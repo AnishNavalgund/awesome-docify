@@ -5,6 +5,9 @@ from typing import Dict, List
 from app.ai_engine_service.prompts import RAG_DOCUMENT_UPDATE_PROMPT
 from app.config import settings
 from app.utils import logger_error
+from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -86,9 +89,6 @@ class DocuRAG(BaseRetriever):
             print(f"\n PROCESSING QUERY: {query}")
             print("=" * 50)
 
-            # Create a custom prompt template for the chain
-            from langchain.prompts import PromptTemplate
-
             # Convert our ChatPromptTemplate to a regular PromptTemplate
             prompt_messages = RAG_DOCUMENT_UPDATE_PROMPT.format_messages(
                 context="{context}", question="{question}"
@@ -109,9 +109,6 @@ class DocuRAG(BaseRetriever):
             custom_prompt = PromptTemplate(
                 input_variables=["context", "question"], template=combined_template
             )
-
-            from langchain.chains import RetrievalQAWithSourcesChain
-            from langchain.chains.question_answering import load_qa_chain
 
             print("CREATING QA CHAIN...")
 
