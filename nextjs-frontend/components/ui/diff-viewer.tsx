@@ -16,11 +16,42 @@ export function DiffViewer({
   newContent,
   changeType
 }: DiffViewerProps) {
-  // Enhanced diff algorithm to highlight word-level changes
+  // Improved diff algorithm that handles non-aligned content better
   const generateDiff = (original: string, newText: string) => {
+    // If there's no original content, treat everything as added
+    if (!original || original.trim() === '') {
+      return newText.split('\n').map(line => ({
+        type: 'added' as const,
+        newLine: line
+      }));
+    }
+
+    // If there's no new content, treat everything as removed
+    if (!newText || newText.trim() === '') {
+      return original.split('\n').map(line => ({
+        type: 'removed' as const,
+        originalLine: line
+      }));
+    }
+
     const originalLines = original.split('\n');
     const newLines = newText.split('\n');
 
+    // If the content is completely different, show as replacement
+    if (originalLines.length === 1 && newLines.length === 1 && originalLines[0] !== newLines[0]) {
+      return [
+        {
+          type: 'removed' as const,
+          originalLine: originalLines[0]
+        },
+        {
+          type: 'added' as const,
+          newLine: newLines[0]
+        }
+      ];
+    }
+
+    // For multi-line content, try to find common patterns
     const diff: Array<{
       type: 'unchanged' | 'added' | 'removed' | 'modified';
       originalLine?: string;
@@ -29,11 +60,12 @@ export function DiffViewer({
       highlightedNew?: string;
     }> = [];
 
+    // Simple line-by-line comparison with better handling
     const maxLines = Math.max(originalLines.length, newLines.length);
 
     for (let i = 0; i < maxLines; i++) {
-      const originalLine = originalLines[i];
-      const newLine = newLines[i];
+      const originalLine = originalLines[i] || '';
+      const newLine = newLines[i] || '';
 
       if (originalLine === newLine) {
         diff.push({
@@ -52,16 +84,13 @@ export function DiffViewer({
           originalLine
         });
       } else {
-        // For modified lines, highlight the differences
-        const highlightedOriginal = highlightDifferences(originalLine, newLine, 'removed');
-        const highlightedNew = highlightDifferences(newLine, originalLine, 'added');
-
+        // For modified lines, show both versions
         diff.push({
           type: 'modified',
           originalLine,
           newLine,
-          highlightedOriginal,
-          highlightedNew
+          highlightedOriginal: highlightDifferences(originalLine, newLine, 'removed'),
+          highlightedNew: highlightDifferences(newLine, originalLine, 'added')
         });
       }
     }
@@ -70,9 +99,9 @@ export function DiffViewer({
   };
 
   // Function to highlight word-level differences
-  const highlightDifferences = (text: string | undefined, compareText: string | undefined, type: 'added' | 'removed') => {
-    const words = text ? text.split(/(\s+)/) : [];
-    const compareWords = compareText ? compareText.split(/(\s+)/) : [];
+  const highlightDifferences = (text: string, compareText: string, type: 'added' | 'removed') => {
+    const words = text.split(/(\s+)/);
+    const compareWords = compareText.split(/(\s+)/);
 
     return words.map((word, index) => {
       const compareWord = compareWords[index];
@@ -85,7 +114,7 @@ export function DiffViewer({
     }).join('');
   };
 
-  const diff = originalContent ? generateDiff(originalContent, newContent || '') : [];
+  const diff = generateDiff(originalContent || '', newContent || '');
 
   const getDiffLineColor = (type: string) => {
     switch (type) {
@@ -123,67 +152,70 @@ export function DiffViewer({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-0">
-            {/* Current Content (Red) */}
-            <div className="bg-red-50 dark:bg-red-900/10 p-4">
-              <div className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
-                Current Content
-              </div>
-              {originalContent ? (
-                <div className="space-y-1">
-                  {diff.map((line, index) => (
-                    <div
-                      key={index}
-                      className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)}`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        {getDiffIcon(line.type)}
-                        <span
-                          className="break-all"
-                          dangerouslySetInnerHTML={{
-                            __html: line.highlightedOriginal || line.originalLine || ''
-                          }}
-                        />
+          {/* Single scrollable container for synchronized scrolling */}
+          <div className="max-h-[400px] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-0">
+              {/* Current Content (Red) */}
+              <div className="bg-red-50 dark:bg-red-900/10 p-4">
+                <div className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                  Current Content
+                </div>
+                {originalContent ? (
+                  <div className="space-y-1">
+                    {diff.map((line, index) => (
+                      <div
+                        key={`original-${index}`}
+                        className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)} min-h-[1.5rem] flex items-center`}
+                      >
+                        <div className="flex items-center space-x-2 w-full">
+                          {getDiffIcon(line.type)}
+                          <span
+                            className="break-words whitespace-pre-wrap flex-1"
+                            dangerouslySetInnerHTML={{
+                              __html: line.type === 'added' ? '' : ('originalLine' in line ? (line.originalLine || '') : '')
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                  No existing content
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                    No existing content
+                  </div>
+                )}
+              </div>
 
-            {/* New Content (Green) */}
-            <div className="bg-green-50 dark:bg-green-900/10 p-4">
-              <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
-                {changeType === 'delete' ? 'After Deletion' : 'New Content'}
-              </div>
-              {changeType === 'delete' && (!newContent || newContent.trim() === '') ? (
-                <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                  Content will be completely removed
+              {/* New Content (Green) */}
+              <div className="bg-green-50 dark:bg-green-900/10 p-4">
+                <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
+                  {changeType === 'delete' ? 'After Deletion' : 'New Content'}
                 </div>
-              ) : (
-                <div className="space-y-1">
-                  {diff.map((line, index) => (
-                    <div
-                      key={index}
-                      className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)}`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        {getDiffIcon(line.type)}
-                        <span
-                          className="break-all"
-                          dangerouslySetInnerHTML={{
-                            __html: line.highlightedNew || line.newLine || ''
-                          }}
-                        />
+                {changeType === 'delete' && (!newContent || newContent.trim() === '') ? (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                    Content will be completely removed
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {diff.map((line, index) => (
+                      <div
+                        key={`new-${index}`}
+                        className={`p-1 rounded text-xs font-mono ${getDiffLineColor(line.type)} min-h-[1.5rem] flex items-center`}
+                      >
+                        <div className="flex items-center space-x-2 w-full">
+                          {getDiffIcon(line.type)}
+                          <span
+                            className="break-words whitespace-pre-wrap flex-1"
+                            dangerouslySetInnerHTML={{
+                              __html: line.type === 'removed' ? '' : ('newLine' in line ? (line.newLine || '') : '')
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

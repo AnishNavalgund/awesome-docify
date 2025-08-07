@@ -90,20 +90,4 @@ class JSONFileContentResponse(BaseModel):
 
 # ---------- Service MODELS ----------
 
-
-class Intent(BaseModel):
-    action: Literal["add", "delete", "modify"]
-    target: str = Field(..., description="The function/class/section to act on")
-    file: Optional[str] = Field(
-        None, description="Optional file name (e.g. 'vector_store.py')"
-    )
-    object_type: Optional[Literal["function", "class", "section", "line"]] = Field(
-        None, description="Type of element to act on"
-    )
-
-
-class ContentChange(BaseModel):
-    """Structured output for content changes"""
-
-    original_content: str = Field(description="The original content as is")
-    new_content: str = Field(description="The new content with changes")
+# RAGDocumentUpdate schema removed - no longer using structured output parsing

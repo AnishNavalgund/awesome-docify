@@ -4,7 +4,6 @@ from pathlib import Path
 from app.config import settings
 from app.schemas import CollectionInfo, JSONFileContentResponse, JSONFileListResponse
 from fastapi import APIRouter, HTTPException
-from qdrant_client import QdrantClient
 
 router = APIRouter(prefix="/api/v1/debug", tags=["Debug"])
 
@@ -64,7 +63,10 @@ async def check_qdrant_status():
         if not qdrant_path.exists():
             raise HTTPException(status_code=404, detail="Qdrant directory not found")
 
-        client = QdrantClient(path=str(qdrant_path))
+        # Use singleton client to prevent multiple instances
+        from app.ai_engine_service.rag_engine import get_qdrant_client
+
+        client = get_qdrant_client()
 
         # Get collection info
         collection_info = client.get_collection(settings.QDRANT_COLLECTION_NAME)

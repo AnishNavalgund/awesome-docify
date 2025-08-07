@@ -2,153 +2,213 @@ import warnings
 from pathlib import Path
 from typing import Dict, List
 
-from app.ai_engine_service.intent import IntentHandlerFactory, extract_intent
+from app.ai_engine_service.prompts import RAG_DOCUMENT_UPDATE_PROMPT
 from app.config import settings
-from app.database import get_db_session
-from app.models import DocumentChunk
-from app.schemas import Intent
-from app.utils import logger_error, logger_info
+from app.utils import logger_error
 from langchain_core.documents import Document
+from langchain_core.retrievers import BaseRetriever
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import FieldCondition, Filter, MatchAny
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 warnings.filterwarnings("ignore")
 
 
-class DocuRAG:
+# Singleton QdrantClient to prevent multiple instances
+_qdrant_client = None
+
+
+def get_qdrant_client():
+    global _qdrant_client
+    if _qdrant_client is None:
+        _qdrant_client = QdrantClient(path=str(Path(settings.QDRANT_PATH)))
+    return _qdrant_client
+
+
+class DocuRAG(BaseRetriever):
+    """Unified RAG system with efficient single-LLM-call approach"""
+
     def __init__(self):
-        self.llm_model = ChatOpenAI(
+        # Initialize parent class properly
+        super().__init__()
+
+        # Initialize components after parent initialization
+        self._llm_model = ChatOpenAI(
             model=settings.LLM_MODEL,
             temperature=settings.LLM_TEMPERATURE,
             max_tokens=settings.LLM_MAX_TOKENS,
             openai_api_key=settings.OPENAI_API_KEY,
         )
-
-        self.embeddings = OpenAIEmbeddings(
+        self._embeddings = OpenAIEmbeddings(
             model=settings.EMBEDDING_MODEL, openai_api_key=settings.OPENAI_API_KEY
         )
+        self._client = get_qdrant_client()  # Use singleton
+        self._collection_name = settings.QDRANT_COLLECTION_NAME
 
-        self.qdrant_path = Path(settings.QDRANT_PATH)
-        self.collection_name = settings.QDRANT_COLLECTION_NAME
-        self._client = None
-
-    def _get_client(self):
-        if self._client is None:
-            self._client = QdrantClient(path=str(self.qdrant_path))
-        return self._client
-
-    def _get_vector_store(self):
-        return QdrantVectorStore(
-            client=self._get_client(),
-            collection_name=self.collection_name,
-            embedding=self.embeddings,
+    async def _aget_relevant_documents(self, query: str) -> List[Document]:
+        """Efficient vector-only retrieval with limited results"""
+        search_results = self._client.search(
+            collection_name=self._collection_name,
+            query_vector=self._embeddings.embed_query(query),
+            limit=settings.TOP_K_DOCS,  # Use the configured limit
+            with_payload=True,
         )
-
-    async def _get_relevant_chunk_ids(
-        self, intent: Intent, db: AsyncSession
-    ) -> List[str]:
-        keyword = intent.target
-
-        # content-based filter
-        stmt = select(DocumentChunk.chunk_id).where(
-            DocumentChunk.content.ilike(f"%{keyword}%")
-        )
-        result = await db.execute(stmt)
-        chunk_ids = [str(row[0]) for row in result.fetchall()]
-
-        # intent is "add" - fallback to top-K recent or semantic search
-        if not chunk_ids and intent.action == "add":
-            logger_info.info(
-                f"No chunks found for '{keyword}', fallback to recent or related chunks for 'add' intent."
+        return [
+            Document(
+                page_content=result.payload.get("page_content", ""),
+                metadata={
+                    **result.payload.get("metadata", {}),
+                    "source": result.payload.get("metadata", {}).get(
+                        "title", "document.md"
+                    ),
+                },
             )
+            for result in search_results
+            if result.score >= settings.MIN_SIMILARITY_SCORE
+        ]
 
-            # Return latest N chunks - temporary fix
-            stmt = (
-                select(DocumentChunk.chunk_id)
-                .order_by(DocumentChunk.created_at.desc())
-                .limit(10)
-            )
-            result = await db.execute(stmt)
-            chunk_ids = [str(row[0]) for row in result.fetchall()]
+    def _get_relevant_documents(self, query: str) -> List[Document]:
+        """Synchronous version required by BaseRetriever"""
+        import asyncio
 
-        return chunk_ids
-
-    async def task_runner(self, query: str) -> Dict:
         try:
-            print("=== TASK ENTRY POINT ===")
-            print(f"Query: {query}")
+            return asyncio.run(self._aget_relevant_documents(query))
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._aget_relevant_documents(query))
+            finally:
+                loop.close()
 
-            intent = await extract_intent(query)
-            print(f">>>> Intent: {intent}")
+    async def process_query(self, query: str) -> Dict:
+        """Simple RAG approach - let the LLM provide natural responses"""
+        try:
+            print(f"\n PROCESSING QUERY: {query}")
+            print("=" * 50)
 
-            async with get_db_session() as db:
-                relevant_chunk_ids = await self._get_relevant_chunk_ids(intent, db)
+            # Create a custom prompt template for the chain
+            from langchain.prompts import PromptTemplate
 
-            print(f" >>> Postgres filter returned {len(relevant_chunk_ids)} chunk_ids")
-            print(f" >>> Chunk IDs: {relevant_chunk_ids}")
+            # Convert our ChatPromptTemplate to a regular PromptTemplate
+            prompt_messages = RAG_DOCUMENT_UPDATE_PROMPT.format_messages(
+                context="{context}", question="{question}"
+            )
 
-            query_embedding = self.embeddings.embed_query(query)
-            client = self._get_client()
+            # Extract the content from the messages
+            system_content = prompt_messages[0].content
+            human_content = prompt_messages[1].content
 
-            search_results = []
+            # Combine into a single template
+            combined_template = f"{system_content}\n\n{human_content}"
 
-            query_filter = Filter(
-                must=[
-                    FieldCondition(
-                        key="metadata.chunk_id", match=MatchAny(any=relevant_chunk_ids)
-                    )
+            print("PROMPT TEMPLATE:")
+            print(f"System: {system_content}")
+            print(f"Human: {human_content}")
+            print("=" * 50)
+
+            custom_prompt = PromptTemplate(
+                input_variables=["context", "question"], template=combined_template
+            )
+
+            from langchain.chains import RetrievalQAWithSourcesChain
+            from langchain.chains.question_answering import load_qa_chain
+
+            print("CREATING QA CHAIN...")
+
+            # Create a custom QA chain with our prompt
+            qa_chain = load_qa_chain(
+                llm=self._llm_model, chain_type="stuff", prompt=custom_prompt
+            )
+
+            print("CREATING RETRIEVAL CHAIN...")
+
+            # Create the retrieval chain with our custom QA chain
+            chain = RetrievalQAWithSourcesChain(
+                retriever=self,
+                combine_documents_chain=qa_chain,
+                return_source_documents=True,
+            )
+
+            print("RETRIEVING DOCUMENTS...")
+            result = await chain.ainvoke({"question": query})
+
+            print("RETRIEVAL RESULT:")
+            print(f"Keys in result: {list(result.keys())}")
+
+            source_docs = result.get("source_documents", [])
+            llm_response = result.get("answer", "")
+
+            print(f"SOURCE DOCUMENTS: {len(source_docs)} found")
+            for i, doc in enumerate(source_docs[:3]):  # Show first 3 docs
+                print(
+                    f"  Doc {i+1}: {doc.metadata.get('title', 'Unknown')} - {len(doc.page_content)} chars"
+                )
+
+            print(f"LLM RESPONSE: {repr(llm_response)}")
+            print("=" * 50)
+
+            # Intelligent document selection - only include relevant documents
+            documents_to_update = []
+
+            if source_docs:
+                # Get unique document titles to avoid duplicates
+                seen_titles = set()
+                print("DOCUMENT SELECTION PROCESS:")
+                for i, doc in enumerate(source_docs):
+                    doc_name = doc.metadata.get("title", "document.md")
+                    print(f"  Processing doc {i+1}: '{doc_name}'")
+                    if doc_name != "document.md" and doc_name not in seen_titles:
+                        seen_titles.add(doc_name)
+                        print(f"    Adding document: '{doc_name}'")
+                        documents_to_update.append(
+                            {
+                                "file": doc_name,
+                                "action": "modify",
+                                "reason": "User requested update",
+                                "section": "content",
+                                "original_content": doc.page_content,  # Provide actual original content
+                                "new_content": llm_response,
+                            }
+                        )
+                    else:
+                        print(
+                            f"    Skipping document: '{doc_name}' (duplicate or invalid)"
+                        )
+                print(f"FINAL DOCUMENTS TO UPDATE: {len(documents_to_update)}")
+
+            # If no documents found, create a default update
+            if not documents_to_update:
+                documents_to_update = [
+                    {
+                        "file": "document.md",
+                        "action": "modify",
+                        "reason": "User requested update",
+                        "section": "content",
+                        "original_content": "",
+                        "new_content": llm_response,
+                    }
                 ]
-            )
 
-            if relevant_chunk_ids:
-                search_results = client.search(
-                    collection_name=self.collection_name,
-                    query_vector=query_embedding,
-                    limit=settings.TOP_K_DOCS * 2,
-                    with_payload=True,
-                    query_filter=query_filter,
-                )
-            else:
-                logger_info.info(
-                    "No relevant chunk_ids found — skipping Qdrant search."
-                )
-
-            logger_info.info(
-                f"Filtered chunks: {len(relevant_chunk_ids)}, "
-                f"Qdrant results: {len(search_results)}"
-            )
-
-            source_documents = []
-            for result in search_results:
-                chunk_id = result.payload.get("metadata", {}).get("chunk_id", "N/A")
-                print(f"Chunk ID: {chunk_id}, Score: {result.score:.4f}")
-                if result.score >= settings.MIN_SIMILARITY_SCORE:
-                    doc = Document(
-                        page_content=result.payload.get("page_content", ""),
-                        metadata=result.payload.get("metadata", {}),
-                    )
-                    source_documents.append(doc)
-
-            print(f"Retrieved {len(source_documents)} high-confidence documents")
-
-            handler = IntentHandlerFactory.create_handler(intent, self.llm_model)
-            documents_to_update = await handler.process_intent(
-                intent, query, source_documents
-            )
-
-            return {
+            final_response = {
                 "query": query,
-                "keyword": intent.target,
-                "analysis": f"Retrieved {len(source_documents)} relevant documents (similarity ≥ {settings.MIN_SIMILARITY_SCORE}) containing '{intent.target}'.",
+                "keyword": "documentation",
+                "analysis": f"Retrieved {len(source_docs)} relevant documents.",
                 "documents_to_update": documents_to_update,
                 "total_documents": len(documents_to_update),
             }
 
+            print("FINAL RESPONSE:")
+            print(f"  Query: {final_response['query']}")
+            print(f"  Analysis: {final_response['analysis']}")
+            print(
+                f"  Documents to update: {len(final_response['documents_to_update'])}"
+            )
+            print("=" * 50)
+
+            return final_response
+
         except Exception as e:
+            print(f"ERROR: {e}")
             logger_error.error(f"Pipeline error: {e}")
             raise e
 
@@ -158,4 +218,4 @@ task = DocuRAG()
 
 
 async def orchestrator(query: str) -> dict:
-    return await task.task_runner(query)
+    return await task.process_query(query)

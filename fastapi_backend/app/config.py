@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 1024
 
     # RAG settings
-    TOP_K_DOCS: int = 10  # Increased for similarity filtering
+    TOP_K_DOCS: int = 10  # Limited to 2 documents for efficiency
     MIN_CHARS_PER_CHUNK: int = 100
 
     # Similarity score threshold

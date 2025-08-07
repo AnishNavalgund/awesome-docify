@@ -8,7 +8,9 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 # Updated regex to include main.py, schemas.py, and all .py files in app/routes
-WATCHER_REGEX_PATTERN = re.compile(r"(main\.py|schemas\.py|routes/.*\.py)$")
+WATCHER_REGEX_PATTERN = re.compile(
+    r"(main\.py|schemas\.py|routes/.*\.py|ai_engine_service/.*\.py|prompts\.py)$"
+)
 APP_PATH = "app"
 
 
@@ -17,6 +19,7 @@ class MyHandler(FileSystemEventHandler):
         super().__init__()
         self.debounce_timer = None
         self.last_modified = 0
+        self.uvicorn_process = None
 
     def on_modified(self, event):
         if not event.is_directory and WATCHER_REGEX_PATTERN.search(
@@ -34,6 +37,7 @@ class MyHandler(FileSystemEventHandler):
         print(f"File {file_path} has been modified and saved.")
         self.run_mypy_checks()
         self.run_openapi_schema_generation()
+        self.restart_application()
 
     def run_mypy_checks(self):
         """Run mypy type checks and print output."""
@@ -69,6 +73,41 @@ class MyHandler(FileSystemEventHandler):
             print("OpenAPI schema generation completed successfully.")
         except subprocess.CalledProcessError as e:
             print(f"An error occurred while generating OpenAPI schema: {e}")
+
+    def restart_application(self):
+        """Restart the uvicorn application."""
+        print("Restarting application...")
+        try:
+            # Find and kill existing uvicorn processes
+            subprocess.run(
+                ["pkill", "-f", "uvicorn.*app.main:app"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            # Wait a moment for the process to stop
+            time.sleep(2)
+
+            # Start a new uvicorn process
+            self.uvicorn_process = subprocess.Popen(
+                [
+                    "uv",
+                    "run",
+                    "uvicorn",
+                    "app.main:app",
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    "8000",
+                    "--reload",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            print("Application restarted successfully.")
+        except Exception as e:
+            print(f"Error restarting application: {e}")
 
 
 if __name__ == "__main__":

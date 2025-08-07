@@ -14,9 +14,8 @@ from app.schemas import (
     SaveChangeResponse,
     SavedChange,
 )
-from app.utils import logger_error, logger_info
+from app.utils import logger_error
 from fastapi import APIRouter, HTTPException
-from qdrant_client import QdrantClient
 from sqlalchemy.future import select
 
 router = APIRouter(prefix="/api/v1", tags=["Docify"])
@@ -129,32 +128,26 @@ async def save_change(request: SaveChangeRequest):
 @router.get("/collection-info", response_model=CollectionInfo)
 async def collection_info():
     """
-    Get vector DB collection info
+    Get information about the Qdrant collection
     """
     try:
-        # Initialize Qdrant client
         qdrant_path = Path(settings.QDRANT_PATH)
-        client = QdrantClient(path=str(qdrant_path))
+        qdrant_path.mkdir(parents=True, exist_ok=True)
 
-        # Get collection info
+        # Use singleton client to prevent multiple instances
+        from app.ai_engine_service.rag_engine import get_qdrant_client
+
+        client = get_qdrant_client()
+
         collection_info = client.get_collection(settings.QDRANT_COLLECTION_NAME)
-
-        info = {
-            "name": settings.QDRANT_COLLECTION_NAME,
-            "vectors_count": collection_info.vectors_count or 0,
-            "points_count": collection_info.points_count or 0,
-            "status": "active",
-        }
-
-        logger_info.info(f">>>>> Collection info received: {info}")
-        return CollectionInfo(**info)
-
+        return CollectionInfo(
+            name=collection_info.name,
+            vectors_count=collection_info.vectors_count,
+            points_count=collection_info.points_count,
+            status=collection_info.status,
+        )
     except Exception as e:
         logger_error.error(f"Error getting collection info: {e}")
-        # Return a default response when Qdrant is not available
-        return CollectionInfo(
-            name=settings.QDRANT_COLLECTION_NAME,
-            vectors_count=0,
-            points_count=0,
-            status="unavailable",
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get collection info: {str(e)}"
         )

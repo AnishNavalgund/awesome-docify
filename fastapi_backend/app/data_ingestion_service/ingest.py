@@ -12,7 +12,6 @@ from langchain.text_splitter import (
 )
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
 
 # === Config ===
@@ -122,7 +121,10 @@ async def ingest_to_qdrant(docs):
     qdrant_path = Path(settings.QDRANT_PATH)
     qdrant_path.mkdir(parents=True, exist_ok=True)
 
-    client = QdrantClient(path=str(qdrant_path))
+    # Use singleton client to prevent multiple instances
+    from app.ai_engine_service.rag_engine import get_qdrant_client
+
+    client = get_qdrant_client()
 
     # Create collection if it doesn't exist
     try:
