@@ -15,8 +15,6 @@ from qdrant_client import QdrantClient
 
 warnings.filterwarnings("ignore")
 
-
-# Singleton QdrantClient to prevent multiple instances
 _qdrant_client = None
 
 
@@ -28,13 +26,9 @@ def get_qdrant_client():
 
 
 class DocuRAG(BaseRetriever):
-    """Unified RAG system with efficient single-LLM-call approach"""
-
     def __init__(self):
-        # Initialize parent class properly
         super().__init__()
 
-        # Initialize components after parent initialization
         self._llm_model = ChatOpenAI(
             model=settings.LLM_MODEL,
             temperature=settings.LLM_TEMPERATURE,
@@ -44,15 +38,15 @@ class DocuRAG(BaseRetriever):
         self._embeddings = OpenAIEmbeddings(
             model=settings.EMBEDDING_MODEL, openai_api_key=settings.OPENAI_API_KEY
         )
-        self._client = get_qdrant_client()  # Use singleton
+        self._client = get_qdrant_client()
         self._collection_name = settings.QDRANT_COLLECTION_NAME
 
     async def _aget_relevant_documents(self, query: str) -> List[Document]:
-        """Efficient vector-only retrieval with limited results"""
+        """Efficient vector-only retrieval"""
         search_results = self._client.search(
             collection_name=self._collection_name,
             query_vector=self._embeddings.embed_query(query),
-            limit=settings.TOP_K_DOCS,  # Use the configured limit
+            limit=settings.TOP_K_DOCS,
             with_payload=True,
         )
         return [
@@ -70,7 +64,6 @@ class DocuRAG(BaseRetriever):
         ]
 
     def _get_relevant_documents(self, query: str) -> List[Document]:
-        """Synchronous version required by BaseRetriever"""
         import asyncio
 
         try:
@@ -89,7 +82,7 @@ class DocuRAG(BaseRetriever):
             print(f"\n PROCESSING QUERY: {query}")
             print("=" * 50)
 
-            # Convert our ChatPromptTemplate to a regular PromptTemplate
+            # Convert ChatPromptTemplate to a regular PromptTemplate
             prompt_messages = RAG_DOCUMENT_UPDATE_PROMPT.format_messages(
                 context="{context}", question="{question}"
             )
@@ -163,7 +156,7 @@ class DocuRAG(BaseRetriever):
                                 "action": "modify",
                                 "reason": "User requested update",
                                 "section": "content",
-                                "original_content": doc.page_content,  # Provide actual original content
+                                "original_content": doc.page_content,  # actual original content
                                 "new_content": llm_response,
                             }
                         )
