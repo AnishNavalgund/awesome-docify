@@ -73,7 +73,9 @@ async def chunk_documents(docs):
         headers_to_split_on=[("#", "h1"), ("##", "h2"), ("###", "h3")]
     )
     recursive_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000, chunk_overlap=150, separators=["\n\n", "\n", ". ", " ", ""]
+        chunk_size=settings.CHUNK_SIZE,
+        chunk_overlap=settings.CHUNK_OVERLAP,
+        separators=["\n\n", "\n", ". ", " ", ""],
     )
 
     # Step 2: Split each document
@@ -88,7 +90,8 @@ async def chunk_documents(docs):
             )  # If header_splitter added section info
 
             content = chunk.page_content
-            if len(content) > 2000:  # Optional: replace with token count
+            # Split only when exceeding configured chunk size
+            if len(content) > settings.CHUNK_SIZE:
                 sub_chunks = recursive_splitter.split_text(content)
                 for idx, sub in enumerate(sub_chunks):
                     metadata = base_metadata.copy()
