@@ -52,13 +52,16 @@ class BaseIntentHandler(ABC):
         """Extract meaningful document name from change data"""
         doc_name = None
 
-        # First try title
-        if change.get("title") and change["title"].strip():
+        #  file_name
+        if change.get("file_name") and change["file_name"].strip():
+            doc_name = change["file_name"].strip()
+        #  title
+        elif change.get("title") and change["title"].strip():
             doc_name = change["title"].strip()
-        # Then try URL
+        #  URL
         elif change.get("url") and change["url"].strip():
             doc_name = change["url"].strip()
-        # Then try source_url
+        # source_url
         elif change.get("source_url") and change["source_url"].strip():
             doc_name = change["source_url"].strip()
 
@@ -110,7 +113,13 @@ class UnifiedIntentHandler(BaseIntentHandler):
 
                 # Create one update per document with the same response
                 for doc in content_extracts:
+                    print(f">>>> Document metadata keys: {list(doc.metadata.keys())}")
+                    print(f">>>> Document metadata: {doc.metadata}")
+                    print(
+                        f">>>> Document page_content preview: {doc.page_content[:200]}..."
+                    )
                     doc_name = self._get_document_name(doc.metadata)
+                    print(f">>>> Extracted doc_name: {doc_name}")
                     documents_to_update.append(
                         DocumentUpdate(
                             file=doc_name,

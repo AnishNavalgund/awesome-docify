@@ -56,24 +56,70 @@ async def query_docs(request: QueryRequest):
 @router.post("/save-change", response_model=SaveChangeResponse)
 async def save_change(request: SaveChangeRequest):
     print(">>>>> Saving changes")
+    print(f">>>>  {len(request.document_updates)}")
+    print(f">>>> Document updates: {request.document_updates}")
+    print(f">>>>  {request.timestamp}")
     """
     Save the user-approved changes to the database (with versioning)
     """
     try:
+        saved_changes = []
         saved_count = 0
         async with AsyncSessionLocal() as session:
+            # verify some documents in the database
+            db_files_result = await session.execute(select(Document.file_name).limit(5))
+            db_files = db_files_result.scalars().all()
+            print(f">>>> db files: {db_files}")
+
+            # verify some titles in the database
+            db_titles_result = await session.execute(select(Document.title).limit(5))
+            db_titles = db_titles_result.scalars().all()
+            print(f">>>> db titles: {db_titles}")
+
+            # verify all documents with their file_name and title
+            all_docs_result = await session.execute(
+                select(Document.file_name, Document.title).limit(10)
+            )
+            all_docs = all_docs_result.fetchall()
+            print(f">>>> db documents (file_name, title): {all_docs}")
+
             for doc_update in request.document_updates:
-                # Look up document by file_name instead of ID
+                print(f">>>> Processing document update for file: {doc_update.file}")
+
+                # Try to find document by file_name first
                 result = await session.execute(
                     select(Document).where(Document.file_name == doc_update.file)
                 )
                 doc = result.scalar_one_or_none()
+
                 if not doc:
-                    continue
+                    print(f">>>> Document not found for file: {doc_update.file}")
+                    # Try to find by title instead
+                    result = await session.execute(
+                        select(Document).where(Document.title == doc_update.file)
+                    )
+                    doc = result.scalar_one_or_none()
+
+                    if not doc:
+                        print(
+                            f">>>> Document not found by title either: {doc_update.file}"
+                        )
+                        continue
+                    else:
+                        print(f">>>> Found document by title: {doc.doc_id}")
+                else:
+                    print(f">>>> Found document by file_name: {doc.doc_id}")
+
+                print(f">>>> Found document: {doc.doc_id}")
+                print(
+                    f">>>> New content provided: {doc_update.new_content is not None}"
+                )
 
                 # Update content if provided
                 if doc_update.new_content is not None:
                     doc.content = doc_update.new_content
+                    print(">>>>> Doc content: ", doc.content)
+                    saved_changes.append(doc_update)
 
                 # Save version and update
                 await save_document_version_and_update(
@@ -86,8 +132,17 @@ async def save_change(request: SaveChangeRequest):
                 saved_count += 1
 
         print(">>>>> Saved in the database!!!")
+        print(">>>>> Saved changes: ", saved_changes)
+        print(
+            f">>>> Final result - saved_count: {saved_count}, saved_changes length: {len(saved_changes)}"
+        )
 
-        return SaveChangeResponse(status="success", saved_count=saved_count)
+        response_data = SaveChangeResponse(
+            status="success", saved_count=saved_count, saved_changes=saved_changes
+        )
+        print(f">>>> Returning response: {response_data}")
+
+        return response_data
 
     except Exception as e:
         logger_error.error(f"Error saving changes: {e}")
